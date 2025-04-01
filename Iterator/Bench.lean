@@ -12,10 +12,10 @@ def sum (l : List Nat) : Nat := Id.run do
   let mut sum := 0
   while true do
     match Iterator.step it with
-    | .yield it' n =>
+    | .yield it' n _ =>
       sum := sum + n
       it := it'
-    | .skip it' =>
+    | .skip it' _ =>
       it := it'
     | .done =>
       break
@@ -27,47 +27,33 @@ def sumrec (l : List Nat) : Nat :=
   go (l.iter.map (2 * ·)) 0
 where
   go it acc :=
-    have := Finite.rel_step it (β := Nat) (m := Id)
-    match _h : Iterator.step it with
-    | .yield it' n => go it' (acc + n)
-    | .skip it' => go it' acc
+    match Iterator.step it with
+    | .yield it' n _ => go it' (acc + n)
+    | .skip it' _ => go it' acc
     | .done => acc
-  termination_by it
-  decreasing_by
-    · simp_all
-    · simp_all
+  termination_by finiteIteratorWF it
 
-#eval! match [1, 2, 3].iter.map (3 * ·) |> Iterator.step with
-  | .yield _ x => x
-  | _ => 0
-
-set_option trace.compiler.ir true in
-@[noinline]
-def sumrecFiniteOfType (l : List Nat) : Nat :=
-  go (attachFinite <| l.iter.map (2 * ·)) 0
+set_option trace.compiler.ir.result true in
+def testIO (l : List Nat) : IO Unit :=
+  go (l.iter IO |>.map (2 * ·))
 where
-  go it acc := match Iterator.step it with
-    | .yield it' n => go it' (acc + n)
-    | .skip it' => go it' acc
-    | .done => acc
-  termination_by stepsRemaining it
-  decreasing_by
-    · sorry
-    · sorry
+  go it := do
+    let step ← Iterator.step it
+    match step with
+    | .yield it' x _ =>
+      if x < 1 then IO.println x
+      go it'
+    | .skip it' _ =>
+      go it'
+    | .done =>
+      return
+  termination_by finiteIteratorWF it
 
-set_option trace.compiler.ir true in
-@[noinline]
-def sumbundled (l : List Nat) : Nat :=
-  go (toFiniteIterator l.iter) 0
-where
-  go it acc := match Iterator.step it with
-    | .yield it' n => go it' (acc + n)
-    | .skip it' => go it' acc
-    | .done => acc
-  termination_by stepsRemaining it
-  decreasing_by
-    · sorry
-    · sorry
+def testIOList : List Nat → IO Unit
+  | [] => pure ()
+  | x :: xs => do
+    if x < 1 then IO.println x
+    testIOList xs
 
 set_option trace.compiler.ir true in
 @[noinline]
@@ -97,13 +83,19 @@ def run (name : String) (f : List Nat → Nat) : IO Unit := do
   let sum ← timeit name <| runInternal f
   IO.println sum
 
+@[noinline]
+def runIOInternal (f : List Nat → IO Unit) : IO Unit := do
+  f l
+
+def runIO (name : String) (f : List Nat → IO Unit) : IO Unit := do
+  timeit name <| runIOInternal f
+
 set_option trace.compiler.ir.result true in
 def Bench.main : IO Unit := do
   for _ in [0:10] do
-    run "List.sum" sum''
-    run "List.sumrec" sumrec
-    run "List.sumrecFiniteOfType" sumrecFiniteOfType
-    -- run "sum" sum
-    -- run "sum'" sum'
+    -- run "List.sum" sum''
+    -- run "iterator recursion" sumrec
+    runIO "it" testIO
+    runIO "l" testIOList
 
-#eval! Bench.main
+#eval Bench.main

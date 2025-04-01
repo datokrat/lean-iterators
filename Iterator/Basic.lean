@@ -54,32 +54,63 @@ def. terminating successor: there's a WF relation _in_ the monad? What does this
 it.successorM.suffices fun it' => it' < it
 -/
 
-inductive IterStep (α β) where
-| yield : (a : α) → β → IterStep α β
-| skip : (a : α) → IterStep α β
-| done : IterStep α β
+inductive IterStep (α β) (yield_prop : α → Prop) (skip_prop : α → Prop) where
+| yield : (it : α) → β → yield_prop it → IterStep α β yield_prop skip_prop
+| skip : (a : α) → skip_prop a → IterStep α β yield_prop skip_prop
+| done : IterStep α β yield_prop skip_prop
 
-variable {p} in
-def IterStep.successor : IterStep α β → Option α
-  | .yield it _ => some it
-  | .skip it => some it
+variable {yp sp} in
+def IterStep.successor : IterStep α β yp sp → Option α
+  | .yield it _ _ => some it
+  | .skip it _ => some it
   | .done => none
 
 class Iterator (α : Type u) (m : outParam (Type (max u v) → Type (max u v))) (β : outParam (Type v)) where
-  step : α → m (IterStep α β)
+  yield_rel : α → α → Prop
+  skip_rel : α → α → Prop
+  step : (a : α) → m (IterStep α β (yield_rel a) (skip_rel a))
 
-class Finite (α : Type u) [Monad m] [Iterator α m β] [WellFoundedRelation α] where
-  rel_step : ∀ it : α, satisfies₃ (Iterator.step it) (fun step => match step with
-      | .yield it' _ => WellFoundedRelation.rel it' it
-      | .skip it' => WellFoundedRelation.rel it' it
-      | .done => True)
+section Finite
 
-class Productive (α : Type u) [Monad m] [Iterator α m β] where
-  rel : WellFoundedRelation α
-  rel_step : ∀ it : α, satisfies₃ (Iterator.step it) (fun step => match step with
-      | .yield _ _ => True
-      | .skip it' => rel.rel it' it
-      | .done => True)
+structure FiniteIteratorWF (α : Type u) [Iterator α m β] where
+  inner : α
+
+def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α) : Prop :=
+  Iterator.yield_rel y.inner x.inner ∨ Iterator.skip_rel y.inner x.inner
+
+def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α :=
+  ⟨it⟩
+
+class Finite (α) [Iterator α m β] : Prop where
+  wf : WellFounded (FiniteIteratorWF.lt (α := α))
+
+instance [Iterator α m β] [Finite α] : WellFoundedRelation (FiniteIteratorWF α) where
+  rel := FiniteIteratorWF.lt
+  wf := Finite.wf
+
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| first | exact Or.inl ‹_› | exact Or.inr ‹_›)
+
+end Finite
+
+section Productive
+
+structure ProductiveIteratorWF (α : Type u) [Iterator α m β] where
+  inner : α
+
+def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α) : Prop :=
+  Iterator.skip_rel y.inner x.inner
+
+def productiveIteratorWF {α m β} [Iterator α m β] (it : α) : ProductiveIteratorWF α :=
+  ⟨it⟩
+
+class Productive (α) [Iterator α m β] : Prop where
+  wf : WellFounded (ProductiveIteratorWF.lt (α := α))
+
+instance [Iterator α m β] [Productive α] : WellFoundedRelation (ProductiveIteratorWF α) where
+  rel := ProductiveIteratorWF.lt
+  wf := Productive.wf
+
+end Productive
 
 -- def terminatesAfter [Iterator α β] (it : α) : Nat → Bool
 --   | 0 => match Iterator.step it with
