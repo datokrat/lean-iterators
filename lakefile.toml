@@ -1,0 +1,10 @@
+name = "Iterator"
+version = "0.1.0"
+defaultTargets = ["iterator"]
+
+[[lean_lib]]
+name = "Iterator"
+
+[[lean_exe]]
+name = "iterator"
+root = "Main"
