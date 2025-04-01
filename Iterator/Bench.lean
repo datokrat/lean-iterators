@@ -26,14 +26,16 @@ set_option trace.compiler.ir.result true in
 def sumrec (l : List Nat) : Nat :=
   go (l.iter.map (2 * ·)) 0
 where
-  go it acc := match Iterator.step it with
+  go it acc :=
+    have := Finite.rel_step it (β := Nat) (m := Id)
+    match _h : Iterator.step it with
     | .yield it' n => go it' (acc + n)
     | .skip it' => go it' acc
     | .done => acc
-  termination_by stepsRemaining it
+  termination_by it
   decreasing_by
-    · sorry
-    · sorry
+    · simp_all
+    · simp_all
 
 #eval! match [1, 2, 3].iter.map (3 * ·) |> Iterator.step with
   | .yield _ x => x
