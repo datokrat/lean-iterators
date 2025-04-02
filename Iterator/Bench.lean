@@ -6,6 +6,7 @@ Authors: Paul Reichert
 import Iterator.Basic
 import Iterator.Bundled
 import Iterator.Generators
+import Iterator.Consumers
 
 open Std
 
@@ -15,7 +16,7 @@ def sum (l : List Nat) : Nat := Id.run do
   let mut it := l.iter
   let mut sum := 0
   while true do
-    match Iterator.step it with
+    match it.step with
     | .yield it' n _ =>
       sum := sum + n
       it := it'
@@ -31,18 +32,26 @@ def sumrec (l : List Nat) : Nat :=
   go (l.iter.map (2 * ·)) 0
 where
   go it acc :=
-    match Iterator.step it with
+    match it.step with
     | .yield it' n _ => go it' (acc + n)
     | .skip it' _ => go it' acc
     | .done => acc
   termination_by finiteIteratorWF it
 
 set_option trace.compiler.ir.result true in
+@[noinline]
+def forInItSum (l : List Nat) : Nat := Id.run do
+  let mut sum := 0
+  for x in l.iter do
+    sum := sum + x
+  return sum
+
+set_option trace.compiler.ir.result true in
 def testIO (l : List Nat) : IO Unit :=
   go (l.iter IO |>.map (2 * ·))
 where
   go it := do
-    let step ← Iterator.step it
+    let step ← it.step
     match step with
     | .yield it' x _ =>
       if x < 1 then IO.println x

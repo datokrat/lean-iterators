@@ -13,47 +13,6 @@ import Iterator.MonadSatisfying
 
 variable {α : Type u} {β : Type v}
 
-/-
-- How to inherit `Finite` instances
-- Enable `if _ : it.has_next then ... it.next ...`
-- Bundling
-- Is bundling still efficient?
-
-Options:
-- double down on bundling and include a flag in the type that determines the finiteness
-  (what are the consequences for codegen?)
-- let α be a type family parameterized by such a flag
-- have `Finite α`; sad: user needs to prove closedness under succession
-- have bundled type (not class) `Iterator α β p`, where `p` is a succession invariant
-
-Inductive definition of monadic termination?
-- the empty iterator terminates
-- an iterator that always produces terminating successors terminates
-
-example :
-1) read bytes from disk
-2) print each byte
-
-This execution can be arbitrarily long, but it is terminating!
-
-def. empty iterator: it.step >>= f = it.step >>= g whenever f .stop = g.stop
-
-bounded iterators: empty after n steps, for some n -> terminating
-
-example:
-1) read file
-2) do something for each byte
-3) then read another file
-4) do something for each byte
-
-A priori, you can't say that the number of remaining steps will be known after `n` steps.
-Only after reading the second file, which can be arbitrarily far in the future.
-
-def. terminating successor: there's a WF relation _in_ the monad? What does this mean?
-
-it.successorM.suffices fun it' => it' < it
--/
-
 inductive IterStep (α β) (yield_prop : α → β → Prop) (skip_prop : α → Prop) where
 | yield : (it : α) → (b : β) → yield_prop it b → IterStep α β yield_prop skip_prop
 | skip : (a : α) → skip_prop a → IterStep α β yield_prop skip_prop

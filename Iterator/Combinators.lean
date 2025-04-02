@@ -24,6 +24,9 @@ instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m 
 instance [Functor m] [Iterator α m β] [Finite α] : Finite (Iter (α := α) m β) where
   wf := InvImage.wf (finiteIteratorWF ∘ Iter.inner ∘ FiniteIteratorWF.inner) Finite.wf
 
+def Iter.step [Functor m] [Iterator α m β] (it : Iter (α := α) m β) :=
+  Iterator.step it
+
 section FilterMap
 
 -- todo: more universe polymorphism
