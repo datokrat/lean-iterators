@@ -4,32 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.Basic
-
-structure Iter (m) (β : Type v) [Iterator α m β] where
-  inner : α
-
-@[inline]
-def toIter {m} [Iterator α m β] (it : α) : Iter (α := α) m β :=
-  ⟨it⟩
-
-instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m β where
-  yielded it it' b := Iterator.yielded it.inner it'.inner b
-  skipped it it' := Iterator.skipped it.inner it'.inner
-  finished it := Iterator.finished it.inner
-  step it := (match · with
-    | .yield it' x h => .yield ⟨it'⟩ x h
-    | .skip it' h => .skip ⟨it'⟩ h
-    | .done h => .done h) <$> (Iterator.step it.inner)
-
-instance [Functor m] [Iterator α m β] [Finite α] : Finite (Iter (α := α) m β) where
-  wf := InvImage.wf (finiteIteratorWF ∘ Iter.inner ∘ FiniteIteratorWF.inner) Finite.wf
-
-instance [Functor m] [Iterator α m β] [Productive α] : Productive (Iter (α := α) m β) where
-  wf := InvImage.wf (productiveIteratorWF ∘ Iter.inner ∘ ProductiveIteratorWF.inner) Productive.wf
-
-def Iter.step [Functor m] [Iterator α m β] (it : Iter (α := α) m β) :=
-  Iterator.step it
+import Iterator.Wrapper
 
 section FilterMap
 
@@ -37,7 +12,7 @@ section FilterMap
 variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f : β → Option γ}
 
 variable (α) in
-structure FilterMap [Iterator α m β] (f : β → Option γ) where
+structure FilterMap (f : β → Option γ) where
   inner : α
 
 instance [Iterator α m β] [Functor m] : Iterator (FilterMap α f) m γ where
@@ -92,3 +67,64 @@ def Iter.filter [Iterator α m β] [Functor m] (f : β → Bool) (it : Iter (α 
   toIter ⟨it⟩
 
 end FilterMap
+
+section FlatMap
+
+-- todo: more universe polymorphism
+variable {m : Type u → Type u} {α α' β β' : Type u} [Iterator α m β] [Iterator α' m β'] {f : β → α'}
+
+class FlatMapAux (α) (f : β → α') where
+  it₁ : α
+  it₂ : Option α'
+
+instance [Functor m] [Iterator α m β] [Iterator α' m β'] : Iterator (FlatMapAux α f) m β' where
+  yielded
+    | { it₁, it₂ := some it₂ }, { it₁ := it₁', it₂ := some it₂' }, b => it₁ = it₁' ∧ Iterator.yielded it₂ it₂' b
+    | _, _, _ => False
+  skipped
+    | { it₁, it₂ := none }, { it₁ := it₁', it₂ := none } => Iterator.skipped it₁ it₁'
+    | { it₁, it₂ := none }, { it₁ := it₁', it₂ := some it₂' } => ∃ b, f b = it₂' ∧ Iterator.yielded it₁ it₁' b
+    | { it₁, it₂ := some it₂ }, { it₁ := it₁', it₂ := none } => it₁ = it₁' ∧ Iterator.finished it₂
+    | { it₁, it₂ := some it₂ }, { it₁ := it₁', it₂ := some it₂' } => it₁ = it₁' ∧ Iterator.skipped it₂ it₂'
+  finished
+    | { it₁, it₂ := none } => Iterator.finished it₁
+    | _ => False
+  step
+    | { it₁, it₂ := none } =>
+      (match · with
+      | .yield it₁' b h => .skip { it₁ := it₁', it₂ := some (f b) } ⟨b, rfl, h⟩
+      | .skip it₁' h => .skip { it₁ := it₁', it₂ := none } h
+      | .done h => .done h) <$> Iterator.step it₁
+    | { it₁, it₂ := some it₂ } =>
+      (match · with
+        | .yield it₂' b h => .yield { it₁ := it₁, it₂ := some it₂' } b ⟨rfl, h⟩
+        | .skip it₂' h => .skip { it₁ := it₁, it₂ := some it₂' } ⟨rfl, h⟩
+        | .done h => .skip { it₁ := it₁, it₂ := none } ⟨rfl, h⟩) <$> Iterator.step it₂
+
+class FlatMap (α) (f : β → α') where
+  inner : FlatMapAux α f
+
+instance [Monad m] [Iterator α m β] [Iterator α' m β'] : Iterator (FlatMap α f) m β' where
+  yielded
+    |
+  step
+    | it@⟨{ it₁ := _, it₂ := none}⟩ => do
+      match ← Iterator.step it.inner with
+      | .yield it' b h => return .yield ⟨it'⟩ b h
+      | .skip it' h => return .skip ⟨it'⟩ h
+      | .done h => return .done h
+    | it@⟨{ it₁ := _, it₂ := some _ }⟩ => do
+      match ← Iterator.step it.inner with
+      | .yield it' b h => return .yield ⟨it'⟩ b h
+      | .skip it'@{ it₁ := _, it₂ := some _ } h => return .skip ⟨it'⟩ h
+      | .skip it'@{ it₁ := _, it₂ := none } h => return convertStep (← Iterator.step it')
+      | .done h => by rfl
+  where
+    @[inline]
+    convertStep : IterStep (FlatMapAux α f) .. → IterStep (FlatMap α f) ..
+      | .yield it' b h => .yield ⟨it'⟩ b h
+      | .skip it' h => .skip ⟨it'⟩ h
+      | .done h => .done h
+
+
+end FlatMap

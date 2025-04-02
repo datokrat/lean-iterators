@@ -18,11 +18,6 @@ inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop
 | skip : (a : α) → skipped a → IterStep α β yielded skipped finished
 | done : finished → IterStep α β yielded skipped finished
 
-def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
-  | .yield it _ _ => some it
-  | .skip it _ => some it
-  | .done _ => none
-
 class Iterator (α : Type u) (m : outParam (Type (max u v) → Type (max u v))) (β : outParam (Type v)) where
   yielded : α → α → β → Prop
   skipped : α → α → Prop
