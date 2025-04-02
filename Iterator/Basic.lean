@@ -69,62 +69,14 @@ instance [Iterator α m β] [Productive α] : WellFoundedRelation (ProductiveIte
   rel := ProductiveIteratorWF.lt
   wf := Productive.wf
 
+theorem ProductiveIteratorWF.subrelation_finiteIteratorWF {α m β} [Iterator α m β] :
+    Subrelation (α := ProductiveIteratorWF α)
+      ProductiveIteratorWF.lt
+      (InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ inner)) := by
+  intro x y
+  exact Or.inr
+
+instance [Iterator α m β] [Finite α] : Productive α where
+  wf := ProductiveIteratorWF.subrelation_finiteIteratorWF.wf (InvImage.wf _ Finite.wf)
+
 end Productive
-
--- def terminatesAfter [Iterator α β] (it : α) : Nat → Bool
---   | 0 => match Iterator.step it with
---     | .done => true
---     | _ => false
---   | n + 1 => (Iterator.step it).successor.elim true (terminatesAfter · n)
-
-
--- noncomputable def Nat.inf (p : Nat → Prop) : Option Nat := by
---   if h : ∃ n, p n ∧ ∀ m, p m → n ≤ m then
---     exact some (h.choose)
---   else
---     exact none
-
--- @[simp]
--- theorem Nat.inf_ge (n : Nat) :
---     Nat.inf (fun m => n ≤ m) = some n := by
---   rw [Nat.inf]
---   split <;> rename_i h
---   · simp only [Option.some.injEq]
---     have hle := h.choose_spec.2 n (Nat.le_refl n)
---     have hge := h.choose_spec.1
---     exact Nat.le_antisymm (h.choose_spec.2 n (Nat.le_refl n)) h.choose_spec.1
---   · simp only [not_exists, not_and, Classical.not_forall, not_imp, Nat.not_le] at h
---     exfalso
---     obtain ⟨m, hle, hgt⟩ := h n (Nat.le_refl n)
---     rw [Nat.lt_iff_le_not_le] at hgt
---     simp_all
-
--- @[simp]
--- theorem Nat.inf_true :
---     Nat.inf (fun _ => true) = some 0 := by
---   simpa using Nat.inf_ge 0
-
--- noncomputable def stepsRemaining? [Iterator α β] (it : α) : Option Nat :=
---   Nat.inf fun n => terminatesAfter it n
-
--- theorem terminatesAfter_step [Iterator α β] {it it' : α} (h : (Iterator.step it).successor = some it') :
---     terminatesAfter it' = fun n => terminatesAfter it (n + 1) := by
---   simp only [terminatesAfter, IterStep.successor]
---   split <;> simp_all [Option.elim, IterStep.successor]
-
--- theorem stepsRemaining?_step [Iterator α β] {it it' : α} (h : (Iterator.step it).successor = some it') :
---     stepsRemaining? it' = (stepsRemaining? it).map (· - 1) := by
---   simp only [stepsRemaining?, terminatesAfter_step h]
---   sorry
-
--- class Finite [Iterator α β] (it : α) where
---   finite : (stepsRemaining? it).isSome
-
--- theorem Finite.yield [Iterator α β] {it it' : α} [Finite it] {x} (h : Iterator.step it = .yield it' x) :
---     Finite it' := by sorry
-
--- theorem Finite.skip [Iterator α β] {it it' : α} [Finite it] (h : Iterator.step it = .skip it') :
---     Finite it' := by sorry
-
--- noncomputable def stepsRemaining [Iterator α β] (it : α) [Finite it] : Nat :=
---   stepsRemaining? it |>.get Finite.finite
