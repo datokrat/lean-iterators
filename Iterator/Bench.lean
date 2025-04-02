@@ -5,7 +5,6 @@ Authors: Paul Reichert
 -/
 import Iterator.Basic
 import Iterator.Bundled
-import Iterator.FiniteOfType
 import Iterator.Generators
 
 open Std
