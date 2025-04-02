@@ -8,7 +8,7 @@ structure ListIterator (α : Type u) (m : Type u → Type u) where
   list : List α
 
 instance [Pure m] : Iterator (ListIterator α m) m α where
-  yield_rel it it' := ∃ a, it.list = a :: it'.list
+  yield_rel it it' a := it.list = a :: it'.list
   skip_rel it it' := False
   step
     | { list := .nil } => pure .done
