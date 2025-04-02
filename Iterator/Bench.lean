@@ -22,7 +22,7 @@ def sum (l : List Nat) : Nat := Id.run do
       it := it'
     | .skip it' _ =>
       it := it'
-    | .done =>
+    | .done _ =>
       break
   return sum
 
@@ -35,7 +35,7 @@ where
     match it.step with
     | .yield it' n _ => go it' (acc + n)
     | .skip it' _ => go it' acc
-    | .done => acc
+    | .done _ => acc
   termination_by finiteIteratorWF it
 
 set_option trace.compiler.ir.result true in
@@ -58,7 +58,7 @@ where
       go it'
     | .skip it' _ =>
       go it'
-    | .done =>
+    | .done _ =>
       return
   termination_by finiteIteratorWF it
 

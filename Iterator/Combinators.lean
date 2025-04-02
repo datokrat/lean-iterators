@@ -14,12 +14,13 @@ def toIter {m} [Iterator α m β] (it : α) : Iter (α := α) m β :=
   ⟨it⟩
 
 instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m β where
-  yield_rel it it' b := Iterator.yield_rel it.inner it'.inner b
-  skip_rel it it' := Iterator.skip_rel it.inner it'.inner
+  yielded it it' b := Iterator.yielded it.inner it'.inner b
+  skipped it it' := Iterator.skipped it.inner it'.inner
+  finished it := Iterator.finished it.inner
   step it := (match · with
     | .yield it' x h => .yield ⟨it'⟩ x h
     | .skip it' h => .skip ⟨it'⟩ h
-    | .done => .done) <$> (Iterator.step it.inner)
+    | .done h => .done h) <$> (Iterator.step it.inner)
 
 instance [Functor m] [Iterator α m β] [Finite α] : Finite (Iter (α := α) m β) where
   wf := InvImage.wf (finiteIteratorWF ∘ Iter.inner ∘ FiniteIteratorWF.inner) Finite.wf
@@ -37,21 +38,22 @@ structure FilterMap [Iterator α m β] (f : β → Option γ) where
   inner : α
 
 instance [Iterator α m β] [Functor m] : Iterator (FilterMap α f) m γ where
-  yield_rel it it' b := ∃ b', f b' = some b ∧ Iterator.yield_rel it.inner it'.inner b'
-  skip_rel it it' := (∃ b', f b' = none ∧ Iterator.yield_rel it.inner it'.inner b') ∨ Iterator.skip_rel it.inner it'.inner
+  yielded it it' b := ∃ b', f b' = some b ∧ Iterator.yielded it.inner it'.inner b'
+  skipped it it' := (∃ b', f b' = none ∧ Iterator.yielded it.inner it'.inner b') ∨ Iterator.skipped it.inner it'.inner
+  finished it := Iterator.finished it.inner
   step it := (match · with
     | .yield it' x h => match h' : f x with
       | none => .skip ⟨it'⟩ (.inl ⟨x, h', h⟩)
       | some y => .yield ⟨it'⟩ y ⟨x, h', h⟩
     | .skip it' h => .skip ⟨it'⟩ (.inr h)
-    | .done => .done) <$> Iterator.step it.inner
+    | .done h => .done h) <$> Iterator.step it.inner
 
 theorem FilterMap.subrel [Functor m] [Iterator α m β] :
     Subrelation
       (FiniteIteratorWF.lt (α := (FilterMap α f)))
       (InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMap.inner ∘ FiniteIteratorWF.inner)) := by
   intro x y hlt
-  simp only [FiniteIteratorWF.lt, Iterator.yield_rel, Iterator.skip_rel] at hlt
+  simp only [FiniteIteratorWF.lt, Iterator.yielded, Iterator.skipped] at hlt
   obtain ⟨b, b', h⟩ | ⟨b', h⟩ | h := hlt
   · exact Or.inl ⟨b', h.2⟩
   · exact Or.inl ⟨b', h.2⟩

@@ -13,21 +13,21 @@ import Iterator.MonadSatisfying
 
 variable {α : Type u} {β : Type v}
 
-inductive IterStep (α β) (yield_prop : α → β → Prop) (skip_prop : α → Prop) where
-| yield : (it : α) → (b : β) → yield_prop it b → IterStep α β yield_prop skip_prop
-| skip : (a : α) → skip_prop a → IterStep α β yield_prop skip_prop
-| done : IterStep α β yield_prop skip_prop
+inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop) (finished : Prop) where
+| yield : (it : α) → (b : β) → yielded it b → IterStep α β yielded skipped finished
+| skip : (a : α) → skipped a → IterStep α β yielded skipped finished
+| done : finished → IterStep α β yielded skipped finished
 
-variable {yp sp} in
-def IterStep.successor : IterStep α β yp sp → Option α
+def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .yield it _ _ => some it
   | .skip it _ => some it
-  | .done => none
+  | .done _ => none
 
 class Iterator (α : Type u) (m : outParam (Type (max u v) → Type (max u v))) (β : outParam (Type v)) where
-  yield_rel : α → α → β → Prop
-  skip_rel : α → α → Prop
-  step : (a : α) → m (IterStep α β (yield_rel a) (skip_rel a))
+  yielded : α → α → β → Prop
+  skipped : α → α → Prop
+  finished : α → Prop
+  step : (a : α) → m (IterStep α β (yielded a) (skipped a) (finished a))
 
 section Finite
 
@@ -35,7 +35,7 @@ structure FiniteIteratorWF (α : Type u) [Iterator α m β] where
   inner : α
 
 def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α) : Prop :=
-  (∃ b, Iterator.yield_rel y.inner x.inner b) ∨ Iterator.skip_rel y.inner x.inner
+  (∃ b, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped y.inner x.inner
 
 def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α :=
   ⟨it⟩
@@ -57,7 +57,7 @@ structure ProductiveIteratorWF (α : Type u) [Iterator α m β] where
   inner : α
 
 def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α) : Prop :=
-  Iterator.skip_rel y.inner x.inner
+  Iterator.skipped y.inner x.inner
 
 def productiveIteratorWF {α m β} [Iterator α m β] (it : α) : ProductiveIteratorWF α :=
   ⟨it⟩

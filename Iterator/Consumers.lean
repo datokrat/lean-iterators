@@ -15,7 +15,7 @@ def Iterator.forIn {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterat
     | .yield c => Iterator.forIn it' c f
     | .done c => return c
   | .skip it' _ => Iterator.forIn (m := m) it' init f
-  | .done => return init
+  | .done _ => return init
 termination_by finiteIteratorWF it
 
 instance {m} [Monad m] [Monad n] [MonadEvalT m n] {α β} [Iterator α m β] [Finite α] :
@@ -28,5 +28,5 @@ def Iterator.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterato
   match ← MonadEvalT.monadEval <| Iterator.step it with
   | .yield it' b _ => Iterator.fold f (← f init b) it'
   | .skip it' _ => Iterator.fold f init it'
-  | .done => return init
+  | .done _ => return init
 termination_by finiteIteratorWF it
