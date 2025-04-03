@@ -52,7 +52,7 @@ def Iteration.instIterator [Monad m] (stepFn : α → Iteration m (RawStep α β
     | ⟨.done _, h⟩ => .done h) <$> (stepFn it).elem
 
 @[inline]
-def matchStep {α β : Type u} [Monad m] [Iterator α m β] (it : α)
+def matchStep {α β} [Monad m] [Iterator α m β] (it : α)
     (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
   match ← Iteration.step it with
   | .yield it' b _ => yield it' b
@@ -96,7 +96,7 @@ theorem Iteration.prop_map {α β m} [Monad m] (f : α → β) (t : Iteration m 
     (f <$> t).prop b ↔ ∃ a, b = f a ∧ t.prop a :=
   Iff.rfl
 
-theorem prop_successor_matchStep {α β γ : Type u} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
+theorem prop_successor_matchStep {α β γ} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
     {f : γ → δ} {x : δ}
     (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) :
     (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
@@ -109,17 +109,17 @@ theorem prop_successor_matchStep {α β γ : Type u} {m} [Monad m] [Iterator α 
   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
 
-theorem successor_skip {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it₁ it₂ : α} :
+theorem successor_skip {α β m} [Monad m] [Iterator α m β] {it₁ it₂ : α} :
     (IterStep.successor <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (some it₂) ↔
       it₂ = it₁ := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
 
-theorem successor_yield {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it₁ it₂ : α} {b} :
+theorem successor_yield {α β m} [Monad m] [Iterator α m β] {it₁ it₂ : α} {b} :
     (IterStep.successor <$> pure (f := Iteration m) (IterStep.yield it₁ b True.intro : RawStep α β)).prop (some it₂) ↔
       it₂ = it₁ := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
 
-theorem successor_done {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it: α} :
+theorem successor_done {α β m} [Monad m] [Iterator α m β] {it: α} :
     (IterStep.successor <$> pure (f := Iteration m) (IterStep.done True.intro : RawStep α β)).prop (some it) ↔
       False := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]

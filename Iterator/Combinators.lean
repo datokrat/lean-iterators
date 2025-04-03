@@ -85,7 +85,7 @@ def FlatMap.init (it : α) (f : β → α') : FlatMap α f :=
 @[inline]
 def flatMapStepNone [Monad m] [Iterator α m β] [Iterator α' m β'] (f : β → α') (it₁ : α) :
     Iteration m (RawStep (FlatMap α f) β') :=
-  matchStep it₁
+  matchStep.{u, u} it₁
     (fun it₁' b => pure <| .skip { it₁ := it₁', it₂ := some (f b) } ⟨⟩)
     (fun it₁' => pure <| .skip { it₁ := it₁', it₂ := none } ⟨⟩)
     (pure <| .done ⟨⟩)
@@ -93,7 +93,7 @@ def flatMapStepNone [Monad m] [Iterator α m β] [Iterator α' m β'] (f : β �
 @[inline]
 def flatMapStepSome [Monad m] [Iterator α m β] [Iterator α' m β'] (f : β → α') (it₁ : α) (it₂ : α') :
     Iteration m (RawStep (FlatMap α f) β') :=
-  matchStep it₂
+  matchStep.{u, u} it₂
     (fun it₂' b => pure <| .yield { it₁ := it₁, it₂ := some it₂' } b ⟨⟩)
     (fun it₂' => pure <| .skip { it₁ := it₁, it₂ := some it₂' } ⟨⟩)
     (flatMapStepNone f it₁)
@@ -129,7 +129,7 @@ theorem descending_flatMapStepNone {α β α' β' : Type u} {m : Type u → Type
     exact Or.inl ⟨_, hy⟩
   · cases successor_skip.mp h
     exact Or.inr hs
-  · simp only [successor_done] at h
+  · simp only [successor_done.{u, u}] at h
 
 theorem descending_flatMapStepSome {α β α' β' : Type u} {m : Type u → Type u} {f : β → α'}
     [Monad m] [Iterator α m β] [Iterator α' m β']

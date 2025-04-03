@@ -18,6 +18,7 @@ inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop
 | skip : (a : α) → skipped a → IterStep α β yielded skipped finished
 | done : finished → IterStep α β yielded skipped finished
 
+set_option pp.all true in
 def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .yield it _ _ => some it
   | .skip it _ => some it
