@@ -24,7 +24,7 @@ def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .skip it _ => some it
   | .done _ => none
 
-class Iterator (α : Type u) (m : outParam (Type (max u v) → Type (max u v))) (β : outParam (Type v)) where
+class Iterator (α : Type u) (m : outParam (Type (max u v) → Type x)) (β : outParam (Type v)) where
   yielded : α → α → β → Prop
   skipped : α → α → Prop
   finished : α → Prop

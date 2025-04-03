@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Wrapper
 import Iterator.AbstractIteration
+import Iterator.IteratorMorphism
 
 section FilterMap
 
@@ -15,6 +16,8 @@ variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f :
 variable (α) in
 structure FilterMap (f : β → Option γ) where
   inner : α
+
+--def stepFn [Iterator α m β] [Monad m] (it : FilterMap α f) : Iteration m (FilterMap.{v, u} α f) := sorry
 
 instance [Iterator α m β] [Functor m] : Iterator (FilterMap α f) m γ where
   yielded it it' b := ∃ b', f b' = some b ∧ Iterator.yielded it.inner it'.inner b'
