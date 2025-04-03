@@ -225,8 +225,8 @@ instance [Monad m] [Iterator α m β] [Iterator α' m β'] : Iterator (FlatMap �
     | { it₁, it₂ := none } => flatMapStepNone f it₁
     | { it₁, it₂ := some it₂ } => flatMapStepSome f it₁ it₂
 
-def FlatMap.lex (f : β → α') (r₁ : α → α → Prop) (r₂ : α' → α' → Prop) : FlatMap α f → FlatMap α f → Prop
-  | ⟨it₁, it₂⟩, ⟨it₁', it₂'⟩ => (it₁, it₂).Lex r₁ (Option.lt r₂) (it₁', it₂')
+def FlatMap.lex (f : β → α') (r₁ : α → α → Prop) (r₂ : α' → α' → Prop) : FlatMap α f → FlatMap α f → Prop :=
+  InvImage (Prod.Lex r₁ (Option.lt r₂)) (fun it => (it.it₁, it.it₂))
 
 theorem FlatMap.lex_of_left {f : β → α'} {r₁ : α → α → Prop} {r₂ : α' → α' → Prop} {it it'}
     (h : r₁ it'.it₁ it.it₁) : FlatMap.lex f r₁ r₂ it' it :=
@@ -246,19 +246,6 @@ theorem Iteration.prop_map {α β m} [Monad m] (f : α → β) (t : Iteration m 
 
 theorem prop_successor_matchStep {α β γ : Type u} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
     {f : γ → δ} {x : δ}
-    (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) {p : Prop}
-    (hy : ∀ it' b, Iterator.yielded it it' b → (f <$> yield it' b).prop x → p)
-    (hs : ∀ it', Iterator.skipped it it' → (f <$> skip it').prop x → p)
-    (hd : (f <$> done).prop x → p) : p := by
-  simp only [matchStep, Iteration.prop_map, Iteration.prop_bind] at h
-  obtain ⟨c, rfl, _, h, h'⟩ := h
-  split at h
-  · exact hy _ _ h' ⟨c, rfl, h⟩
-  · exact hs _ h' ⟨c, rfl, h⟩
-  · exact hd ⟨c, rfl, h⟩
-
-theorem prop_successor_matchStep' {α β γ : Type u} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
-    {f : γ → δ} {x : δ}
     (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) :
     (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
     (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').prop x) ∨
@@ -269,14 +256,6 @@ theorem prop_successor_matchStep' {α β γ : Type u} {m} [Monad m] [Iterator α
   · exact Or.inl ⟨_, _, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
-
--- theorem FiniteIteratorWF.lt_of_prop_yield {α β : Type u} {m} [Monad m] {it it' : α} {b : β} [Iterator α m β] :
---     (Iteration.step it).prop (.yield it' b ⟨⟩) → (finiteIteratorWF it').lt (finiteIteratorWF it) :=
---   fun h => Or.inl ⟨b, h⟩
-
--- theorem FiniteIteratorWF.lt_of_prop_skip {α β : Type u} {m} [Monad m] {it it' : α} [Iterator α m β] :
---     (Iteration.step it).prop (.skip it' ⟨⟩) → (finiteIteratorWF it').lt (finiteIteratorWF it) :=
---   fun h => Or.inr h
 
 theorem FiniteIteratorWF.lt_iff_successor {α β : Type u} {m} [Monad m] [Iterator α m β] {it it' : FiniteIteratorWF α} :
     it'.lt it ↔ (IterStep.successor <$> Iteration.step it.inner).prop (some it'.inner) := by
@@ -329,7 +308,7 @@ theorem descending_flatMapStepNone {α β α' β' : Type u} {m : Type u → Type
     (h : (IterStep.successor <$> flatMapStepNone (f := f) it₁).prop (some it')) :
     (finiteIteratorWF (m := m) it'.it₁).lt (finiteIteratorWF it₁) := by
   simp only [flatMapStepNone] at h
-  have := prop_successor_matchStep' h
+  have := prop_successor_matchStep h
   obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := this
   · cases successor_skip.mp h
     exact Or.inl ⟨_, hy⟩
@@ -343,7 +322,7 @@ theorem descending_flatMapStepSome {α β α' β' : Type u} {m : Type u → Type
     (h : (IterStep.successor <$> flatMapStepSome f it₁ it₂).prop (some it')) :
     rel it' { it₁ := it₁, it₂ := some it₂ } := by
   simp only [flatMapStepSome] at h
-  obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep' h
+  obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep h
   · cases successor_yield.mp h
     apply FlatMap.lex_of_right
     exact Or.inl ⟨_, hy⟩
@@ -353,10 +332,32 @@ theorem descending_flatMapStepSome {α β α' β' : Type u} {m : Type u → Type
   · apply FlatMap.lex_of_left
     exact descending_flatMapStepNone h
 
+theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
+  refine ⟨?_⟩
+  intro x
+  have hn : Acc (Option.lt rel) none := by
+    refine Acc.intro none ?_
+    intro y hyx
+    cases y <;> cases hyx
+  cases x
+  · exact hn
+  · rename_i x
+    induction h.apply x
+    rename_i x' h ih
+    refine Acc.intro _ ?_
+    intro y hyx'
+    cases y
+    · exact hn
+    · exact ih _ hyx'
+
 instance [Monad m] [Iterator α m β] [Iterator α' m β'] [Finite α] [Finite α'] :
     Finite (FlatMap α f) := by
   refine finite_instIterator _ (rel := rel) ?_ ?_
-  · sorry
+  · simp only [rel, FlatMap.lex]
+    apply InvImage.wf
+    refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
+    · exact InvImage.wf _ Finite.wf
+    · exact Option.wellFounded_lt <| InvImage.wf _ Finite.wf
   · intro it it' h
     split at h
     · apply FlatMap.lex_of_left
