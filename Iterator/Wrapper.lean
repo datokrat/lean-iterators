@@ -28,5 +28,6 @@ instance [Functor m] [Iterator α m β] [Finite α] : Finite (Iter (α := α) m 
 instance [Functor m] [Iterator α m β] [Productive α] : Productive (Iter (α := α) m β) where
   wf := InvImage.wf (productiveIteratorWF ∘ Iter.inner ∘ ProductiveIteratorWF.inner) Productive.wf
 
+@[inline]
 def Iter.step [Functor m] [Iterator α m β] (it : Iter (α := α) m β) :=
   Iterator.step it

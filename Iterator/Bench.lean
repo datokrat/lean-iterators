@@ -47,6 +47,27 @@ def forInItSum (l : List Nat) : Nat := Id.run do
   return sum
 
 set_option trace.compiler.ir.result true in
+def testFlatMap (l : List (List Nat)) : Nat :=
+  go (l.iter.flatMap fun l' => l'.iter) 0
+where
+  @[specialize]
+  go it acc :=
+    match it.step with
+    | .yield it' n _ => go it' (acc + n)
+    | .skip it' _ => go it' acc
+    | .done _ => acc
+  termination_by finiteIteratorWF it
+
+set_option trace.compiler.ir.result true in
+def testFlatMap' (l : List (List Nat)) : Nat := Id.run do
+  let mut sum := 0
+  for x in l.iter.flatMap (fun l' => l'.iter) do
+    sum := sum + x
+  return sum
+
+#eval! testFlatMap [[1, 2], [3]]
+
+set_option trace.compiler.ir.result true in
 def testIO (l : List Nat) : IO Unit :=
   go (l.iter IO |>.map (2 * ·))
 where
