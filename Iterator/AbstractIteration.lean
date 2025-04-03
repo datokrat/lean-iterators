@@ -1,0 +1,127 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
+prelude
+import Iterator.Wrapper
+
+section AbstractIteration
+
+abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
+
+abbrev IterStep.for {α β m} [Iterator α m β] (it : α) := IterStep α β (Iterator.yielded it) (Iterator.skipped it) (Iterator.finished it)
+
+structure Iteration (m) [Monad m] (γ : Type u) where
+  prop : γ → Prop
+  elem : m { c // prop c }
+
+@[inline]
+def Iteration.pure {γ m} [Monad m] (c : γ) : Iteration m γ :=
+  { prop c' := (c' = c), elem := Pure.pure ⟨c, rfl⟩ }
+
+@[inline]
+def Iteration.bind {γ δ m} [Monad m] (t : Iteration m γ) (f : γ → Iteration m δ) : Iteration m δ :=
+  { prop d := ∃ c, (f c).prop d ∧ t.prop c, elem :=
+    Bind.bind t.elem (fun c => (fun x => ⟨x.1, ⟨c.1, x.2, c.2⟩⟩) <$> (f c.1).elem) }
+
+instance (m) [Monad m] : Monad (Iteration m) where
+  pure := Iteration.pure
+  bind := Iteration.bind
+
+@[inline]
+def Iteration.step {α β : Type u} [Iterator α m β] [Monad m] (it : α) : Iteration m (IterStep.for it) :=
+  { prop
+      | .yield it' b _ => Iterator.yielded it it' b
+      | .skip it' _ => Iterator.skipped it it'
+      | .done _ => Iterator.finished it,
+    elem := (fun step => ⟨step, match step with
+        | .yield _ _ h => h
+        | .skip _ h => h
+        | .done h => h⟩) <$> Iterator.step it
+  }
+
+@[inline]
+def Iteration.instIterator [Monad m] (stepFn : α → Iteration m (RawStep α β)) : Iterator α m β where
+  yielded it it' b := (stepFn it).prop (.yield it' b ⟨⟩)
+  skipped it it' := (stepFn it).prop (.skip it' ⟨⟩)
+  finished it := (stepFn it).prop (.done ⟨⟩)
+  step it := (match · with
+    | ⟨.yield it' b _, h⟩ => .yield it' b h
+    | ⟨.skip it' _, h⟩ => .skip it' h
+    | ⟨.done _, h⟩ => .done h) <$> (stepFn it).elem
+
+@[inline]
+def matchStep {α β : Type u} [Monad m] [Iterator α m β] (it : α)
+    (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
+  match ← Iteration.step it with
+  | .yield it' b _ => yield it' b
+  | .skip it' _ => skip it'
+  | .done _ => done
+
+theorem finite_instIterator {α} [Monad m] (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
+    letI : Iterator α m β := Iteration.instIterator stepFn
+    (h : ∀ it it', (IterStep.successor <$> stepFn it).prop (some it') → rel it' it) → Finite α := by
+  letI : Iterator α m β := Iteration.instIterator stepFn
+  intro h
+  refine ⟨?_⟩
+  refine Subrelation.wf ?_ <| InvImage.wf FiniteIteratorWF.inner hwf
+  intro it it' hlt
+  specialize h it'.inner it.inner
+  apply h
+  simp [Functor.map, Iteration.bind, Iteration.pure]
+  simp [FiniteIteratorWF.lt, Iteration.instIterator] at hlt
+  obtain ⟨b, hlt⟩ | hlt := hlt
+  · exact ⟨_, rfl, hlt⟩
+  · exact ⟨_, rfl, hlt⟩
+
+theorem productive_instIterator {α} [Monad m] (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
+    letI : Iterator α m β := Iteration.instIterator stepFn
+    (h : ∀ it it', (stepFn it).prop (.skip it' ⟨⟩) → rel it' it) → Productive α := by
+  letI : Iterator α m β := Iteration.instIterator stepFn
+  intro h
+  refine ⟨?_⟩
+  refine Subrelation.wf ?_ <| InvImage.wf ProductiveIteratorWF.inner hwf
+  intro it it' hlt
+  specialize h it'.inner it.inner
+  apply h
+  simp [ProductiveIteratorWF.lt, Iteration.instIterator] at hlt
+  exact hlt
+
+theorem Iteration.prop_bind {α β m} [Monad m] (f : α → Iteration m β) (t : Iteration m α) (b : β) :
+    (t >>= f).prop b ↔ ∃ a, (f a).prop b ∧ t.prop a :=
+  Iff.rfl
+
+theorem Iteration.prop_map {α β m} [Monad m] (f : α → β) (t : Iteration m α) (b : β) :
+    (f <$> t).prop b ↔ ∃ a, b = f a ∧ t.prop a :=
+  Iff.rfl
+
+theorem prop_successor_matchStep {α β γ : Type u} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
+    {f : γ → δ} {x : δ}
+    (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) :
+    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
+    (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').prop x) ∨
+    (Iterator.finished it ∧ (f <$> done).prop x) := by
+  simp only [Iteration.prop_map, matchStep, Iteration.prop_bind] at h
+  obtain ⟨c, rfl, _, h, h'⟩ := h
+  split at h
+  · exact Or.inl ⟨_, _, ‹_›, ⟨c, rfl, h⟩⟩
+  · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
+  · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
+
+theorem successor_skip {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it₁ it₂ : α} :
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (some it₂) ↔
+      it₂ = it₁ := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+theorem successor_yield {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it₁ it₂ : α} {b} :
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.yield it₁ b True.intro : RawStep α β)).prop (some it₂) ↔
+      it₂ = it₁ := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+theorem successor_done {α β : Type u} {m : Type u → Type u} [Monad m] [Iterator α m β] {it: α} :
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.done True.intro : RawStep α β)).prop (some it) ↔
+      False := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+end AbstractIteration
