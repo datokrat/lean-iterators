@@ -106,9 +106,10 @@ end ULiftState
 
 section FlatMap
 
+section Def
+
 universe u v v'
 
--- todo: more universe polymorphism
 variable {α α': Type (max u v v')} {β : Type v} {β' : Type v'}
   {m : Type (max u v v') → Type (max u v v')}
   [Iterator α m β] [Iterator α' m β'] {f : β → α'}
@@ -144,6 +145,14 @@ instance [Monad m] [Iterator α m β] [Iterator α' m β'] : Iterator (FlatMap �
     | { it₁, it₂ := none } => flatMapStepNone.{u} f it₁
     | { it₁, it₂ := some it₂ } => flatMapStepSome.{u} f it₁ it₂
 
+end Def
+
+section UniverseMonomorphic
+
+universe u
+
+variable {α β α' β' : Type u} {m : Type u → Type u} {f : β → α'}
+
 def FlatMap.lex (f : β → α') (r₁ : α → α → Prop) (r₂ : α' → α' → Prop) : FlatMap α f → FlatMap α f → Prop :=
   InvImage (Prod.Lex r₁ (Option.lt r₂)) (fun it => (it.it₁, it.it₂))
 
@@ -156,31 +165,31 @@ theorem FlatMap.lex_of_right {f : β → α'} {r₁ : α → α → Prop} {r₂ 
   Prod.Lex.right _ h
 
 def rel [Iterator α m β] [Iterator α' m β'] : FlatMap α f → FlatMap α f → Prop :=
-  FlatMap.lex.{u} f (InvImage FiniteIteratorWF.lt finiteIteratorWF) (InvImage FiniteIteratorWF.lt finiteIteratorWF)
+  FlatMap.lex f (InvImage FiniteIteratorWF.lt finiteIteratorWF) (InvImage FiniteIteratorWF.lt finiteIteratorWF)
 
 theorem descending_flatMapStepNone
-    [Monad m] {it₁ : α} {it' : FlatMap α f}
-    (h : (IterStep.successor <$> flatMapStepNone.{u} (f := f) it₁).prop (some it')) :
+    [Monad m] [Iterator α m β] [Iterator α' m β'] {it₁ : α} {it' : FlatMap α f}
+    (h : ((ULift.up ∘ IterStep.successor) <$> flatMapStepNone (f := f) it₁).prop (ULift.up <| some it')) :
     (finiteIteratorWF (m := m) it'.it₁).lt (finiteIteratorWF it₁) := by
   simp only [flatMapStepNone] at h
   have := prop_successor_matchStep h
   obtain ⟨it'', b, hy, h⟩ | ⟨it'', hs, h⟩ | ⟨hd, h⟩ := this
-  · cases successor_skip (α := type_of% it') (β := β') |>.mp h
+  · cases up_successor_skip (α := type_of% it') (β := β') |>.mp h
     exact Or.inl ⟨_, hy⟩
-  · cases successor_skip (α := FlatMap α f) |>.mp h
+  · cases up_successor_skip (α := FlatMap α f) |>.mp h
     exact Or.inr hs
-  · cases successor_done (α := FlatMap α f) |>.mp h
+  · cases up_successor_done (α := FlatMap α f) |>.mp h
 
 theorem descending_flatMapStepSome
-    [Monad m] {it₁ : α} {it₂ : α'} {it' : FlatMap α f}
-    (h : (IterStep.successor <$> flatMapStepSome f it₁ it₂).prop (some it')) :
+    [Monad m] [Iterator α m β] [Iterator α' m β'] {it₁ : α} {it₂ : α'} {it' : FlatMap α f}
+    (h : ((ULift.up ∘ IterStep.successor) <$> flatMapStepSome f it₁ it₂).prop (ULift.up <| some it')) :
     rel it' { it₁ := it₁, it₂ := some it₂ } := by
   simp only [flatMapStepSome] at h
   obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep h
-  · cases successor_yield (α := FlatMap α f) |>.mp h
+  · cases up_successor_yield (α := FlatMap α f) |>.mp h
     apply FlatMap.lex_of_right
     exact Or.inl ⟨_, hy⟩
-  · cases successor_skip (α := FlatMap α f) |>.mp h
+  · cases up_successor_skip (α := FlatMap α f) |>.mp h
     apply FlatMap.lex_of_right
     exact Or.inr hs
   · apply FlatMap.lex_of_left
@@ -204,9 +213,9 @@ theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded r
     · exact hn
     · exact ih _ hyx'
 
-instance [Monad m] [Finite α] [Finite α'] :
+instance [Monad m] [Iterator α m β] [Iterator α' m β'] [Finite α] [Finite α'] :
     Finite (FlatMap α f) := by
-  refine finite_instIterator.{max u v v', v'} (α := FlatMap.{max u v v'} α f) (β := β') (m := m) _ (rel := rel) ?_ ?_
+  refine finite_instIterator (m := m) _ (rel := rel) ?_ ?_
   · simp only [rel, FlatMap.lex]
     apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
@@ -217,6 +226,26 @@ instance [Monad m] [Finite α] [Finite α'] :
     · apply FlatMap.lex_of_left
       exact descending_flatMapStepNone h
     · exact descending_flatMapStepSome h
+
+end UniverseMonomorphic
+
+section Morphisms
+
+end Morphisms
+
+section UniversePolymorphic
+
+universe u v v'
+
+variable {α α': Type (max u v v')} {β : Type v} {β' : Type v'}
+  {m : Type (max u v v') → Type (max u v v')}
+  [Iterator α m β] [Iterator α' m β'] {f : β → α'}
+
+def FlatMap.universeMonomorphisation : IteratorMorphism (FlatMap α f) (FlatMap
+
+end UniversePolymorphic
+
+#exit
 
 @[inline]
 def Iter.flatMap [Monad m] [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :
