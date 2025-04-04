@@ -20,19 +20,10 @@ structure FilterMap (f : β → Option γ) where
 -- @[inline]
 -- def Iteration.instIterator' {α : Type u} {β : Type v} [Functor m] (stepFn : α → Iteration m (RawStep α β)) : Iterator α m β where
 
-@[inline]
-def matchStep' {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
-    (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
-  haveI := Iteration.step (α := α) (m := m) (β := β) it
-  match ← Iteration.step it with
-  | .yield it' b _ => yield it' b
-  | .skip it' _ => skip it'
-  | .done _ => done
-
 instance [Iterator α m β] [Monad m] : Iterator (FilterMap α f) m γ :=
   letI := Iterator.uLiftUp α
   Iteration.instIterator fun it => do
-    matchStep' it.inner
+    matchStep it.inner
       (fun it' b => pure <| match f b with
           | none => IterStep.skip ⟨it'⟩ ⟨⟩
           | some c => IterStep.yield ⟨it'⟩ c ⟨⟩)
@@ -55,75 +46,6 @@ instance [Iterator α m β] [Monad m] [Finite α] : Finite (FilterMap α f) := b
     · cases successor_skip.mp h'
       exact Or.inr h
     · cases successor_done.mp h'
-
--- instance [Iterator α m β] [Monad m] : Iterator (ULift.{v} (FilterMap α f)) m (ULift.{u} γ) :=
---   letI := Iterator.uLiftUp α
---   Iteration.instIterator fun it => do
---     matchStep.{max u v} (ULift.up.{v} it.down.inner)
---       (fun it' b => pure <| match f b.down with
---           | none => IterStep.skip (.up ⟨it'.down⟩) ⟨⟩
---           | some c => IterStep.yield (.up ⟨it'.down⟩) (.up c) ⟨⟩)
---       (fun it' => pure <| IterStep.skip (.up ⟨it'.down⟩) ⟨⟩)
---       (pure <| IterStep.done ⟨⟩)
-
--- instance [Iterator α m β] [Monad m] [Finite α] : Finite (ULift.{v} (FilterMap α f)) := by
---   refine finite_instIterator.{max u v} (m := m) (rel := ?_) ?_ ?_ ?_
---   · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMap.inner ∘ ULift.down)
---   · apply InvImage.wf
---     exact Finite.wf
---   · intro it it' h
---     replace h := prop_successor_matchStep h
---     obtain ⟨it'', b, h, h'⟩ | ⟨it'', h, h'⟩ | ⟨h, h'⟩ := h
---     · split at h'
---       · cases successor_skip.mp h'
---         apply Or.inl ⟨_, h⟩
---       · cases successor_yield.mp h'
---         apply Or.inl ⟨_, h⟩
---     · cases successor_skip.mp h'
---       exact Or.inr h
---     · cases successor_done.mp h'
-
-instance [Iterator α m β] [Monad m] : Iterator (FilterMap α f) m γ :=
-  Iterator.uLiftDown (FilterMap α f)
-
-instance [Iterator α m β] [Monad m] [Finite α] : Finite (FilterMap α f) :=
-  IteratorMorphism.uLiftUp _ |>.pullbackFinite
-
--- instance [Iterator α m β] [Functor m] : Iterator (FilterMap α f) m γ where
---   yielded it it' b := ∃ b', f b' = some b ∧ Iterator.yielded it.inner it'.inner b'
---   skipped it it' := (∃ b', f b' = none ∧ Iterator.yielded it.inner it'.inner b') ∨ Iterator.skipped it.inner it'.inner
---   finished it := Iterator.finished it.inner
---   step it := (match · with
---     | .yield it' x h => match h' : f x with
---       | none => .skip ⟨it'⟩ (.inl ⟨x, h', h⟩)
---       | some y => .yield ⟨it'⟩ y ⟨x, h', h⟩
---     | .skip it' h => .skip ⟨it'⟩ (.inr h)
---     | .done h => .done h) <$> Iterator.step it.inner
-
--- theorem FilterMap.finiteIteratorWF_subrelation [Functor m] [Iterator α m β] :
---     Subrelation
---       (FiniteIteratorWF.lt (α := (FilterMap α f)))
---       (InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMap.inner ∘ FiniteIteratorWF.inner)) := by
---   intro x y hlt
---   simp only [FiniteIteratorWF.lt, Iterator.yielded, Iterator.skipped] at hlt
---   obtain ⟨b, b', h⟩ | ⟨b', h⟩ | h := hlt
---   · exact Or.inl ⟨b', h.2⟩
---   · exact Or.inl ⟨b', h.2⟩
---   · exact Or.inr h
-
--- theorem FilterMap.productiveIteratorWF_subrelation [Functor m] [Iterator α m β] :
---     Subrelation
---       (ProductiveIteratorWF.lt (α := (FilterMap α (some ∘ f))))
---       (InvImage ProductiveIteratorWF.lt (productiveIteratorWF ∘ FilterMap.inner ∘ ProductiveIteratorWF.inner)) := by
---   intro x y hlt
---   simp only [ProductiveIteratorWF.lt, Iterator.yielded, Iterator.skipped] at hlt
---   obtain ⟨_, h, _⟩ | h := hlt
---   · contradiction
---   · exact h
-
--- instance [Functor m] [Iterator α m β] [Finite α] : Finite (FilterMap α f) where
---   wf := FilterMap.finiteIteratorWF_subrelation.wf <|
---     InvImage.wf (finiteIteratorWF ∘ FilterMap.inner ∘ FiniteIteratorWF.inner) Finite.wf
 
 @[inline]
 def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :
