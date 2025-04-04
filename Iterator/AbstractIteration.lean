@@ -123,16 +123,31 @@ theorem prop_successor_matchStep {α β γ} {m} [Monad m] [Iterator α m β] {it
   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
 
 theorem successor_skip {α β m} [Functor m] [Pure m] [Iterator α m β] {it₁ it₂ : α} :
-    ((ULift.up ∘ IterStep.successor) <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (ULift.up <| some it₂) ↔
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (some it₂) ↔
       it₂ = it₁ := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
 
 theorem successor_yield {α β m} [Functor m] [Pure m] [Iterator α m β] {it₁ it₂ : α} {b} :
-    ((ULift.up ∘ IterStep.successor) <$> pure (f := Iteration m) (IterStep.yield it₁ b True.intro : RawStep α β)).prop (ULift.up <| some it₂) ↔
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.yield it₁ b True.intro : RawStep α β)).prop (some it₂) ↔
       it₂ = it₁ := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
 
 theorem successor_done {α β m} [Functor m] [Pure m] [Iterator α m β] {it: α} :
+    (IterStep.successor <$> pure (f := Iteration m) (IterStep.done True.intro : RawStep α β)).prop (some it) ↔
+      False := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+theorem up_successor_skip {α β m} [Functor m] [Pure m] [Iterator α m β] {it₁ it₂ : α} :
+    ((ULift.up ∘ IterStep.successor) <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (ULift.up <| some it₂) ↔
+      it₂ = it₁ := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+theorem up_successor_yield {α β m} [Functor m] [Pure m] [Iterator α m β] {it₁ it₂ : α} {b} :
+    ((ULift.up ∘ IterStep.successor) <$> pure (f := Iteration m) (IterStep.yield it₁ b True.intro : RawStep α β)).prop (ULift.up <| some it₂) ↔
+      it₂ = it₁ := by
+  simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
+
+theorem up_successor_done {α β m} [Functor m] [Pure m] [Iterator α m β] {it: α} :
     ((ULift.up ∘ IterStep.successor) <$> pure (f := Iteration m) (IterStep.done True.intro : RawStep α β)).prop (ULift.up <| some it) ↔
       False := by
   simp [Iteration.prop_map, Pure.pure, Iteration.pure, IterStep.successor]
