@@ -41,7 +41,7 @@ instance (m) [Monad m] : Monad (Iteration m) where
   bind := Iteration.bind
 
 @[inline]
-def Iteration.step {α β : Type u} [Iterator α m β] [Functor m] (it : α) : Iteration m (IterStep.for it) :=
+def Iteration.step {α : Type u} {β : Type v} [Iterator α m β] [Functor m] (it : α) : Iteration m (IterStep.for it) :=
   { prop
       | .yield it' b _ => Iterator.yielded it it' b
       | .skip it' _ => Iterator.skipped it it'
@@ -70,9 +70,10 @@ def matchStep {α β} [Monad m] [Iterator α m β] (it : α)
   | .skip it' _ => skip it'
   | .done _ => done
 
-theorem finite_instIterator {α} [Functor m] (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
+theorem finite_instIterator {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)} [Functor m]
+    (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
     letI : Iterator α m β := Iteration.instIterator stepFn
-    (h : ∀ it it', (IterStep.successor <$> stepFn it).prop (some it') → rel it' it) → Finite α := by
+    (h : ∀ it it', ((ULift.up ∘ IterStep.successor) <$> stepFn it).prop (ULift.up <| some <| it') → rel it' it) → Finite α := by
   letI : Iterator α m β := Iteration.instIterator stepFn
   intro h
   refine ⟨?_⟩
@@ -80,8 +81,8 @@ theorem finite_instIterator {α} [Functor m] (stepFn : α → Iteration m (RawSt
   intro it it' hlt
   specialize h it'.inner it.inner
   apply h
-  simp [Functor.map, Iteration.bind, Iteration.pure]
-  simp [FiniteIteratorWF.lt, Iteration.instIterator] at hlt
+  simp only [Functor.map]
+  simp only [FiniteIteratorWF.lt, Iteration.instIterator] at hlt
   obtain ⟨b, hlt⟩ | hlt := hlt
   · exact ⟨_, rfl, hlt⟩
   · exact ⟨_, rfl, hlt⟩
@@ -96,7 +97,7 @@ theorem productive_instIterator {α} [Functor m] (stepFn : α → Iteration m (R
   intro it it' hlt
   specialize h it'.inner it.inner
   apply h
-  simp [ProductiveIteratorWF.lt, Iteration.instIterator] at hlt
+  simp only [ProductiveIteratorWF.lt, Iteration.instIterator] at hlt
   exact hlt
 
 theorem Iteration.prop_bind {α β m} [Monad m] (f : α → Iteration m β) (t : Iteration m α) (b : β) :

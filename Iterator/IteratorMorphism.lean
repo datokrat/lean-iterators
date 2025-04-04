@@ -30,6 +30,7 @@ theorem IteratorMorphism.pullbackFinite [Finite α'] (φ : IteratorMorphism α �
       · exact Or.inl ⟨φ.mapValue b, φ.preserves_yielded.mpr h⟩
       · exact Or.inr (φ.preserves_skipped.mpr h)
 
+@[inline]
 def Iterator.uLiftUp (α : Type u) {β : Type v} {m} [Functor m] [Iterator α m β] :
     Iterator (ULift.{v} α) m (ULift.{u} β) where
   yielded it it' b := Iterator.yielded it.down it'.down b.down
@@ -41,6 +42,7 @@ def Iterator.uLiftUp (α : Type u) {β : Type v} {m} [Functor m] [Iterator α m 
       | .skip it' h => .skip (.up it') h
       | .done h => .done h) <$> Iterator.step it.down
 
+@[inline]
 def Iterator.uLiftDown (α : Type u) {β : Type v} {m : Type (max u v) → Type (max u v)}
     [Functor m] [Iterator (ULift.{v} α) m (ULift.{u} β)] :
     Iterator α m β where
