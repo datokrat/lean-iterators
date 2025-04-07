@@ -10,6 +10,8 @@ import Iterator.Consumers
 
 open Std
 
+section ListIterator
+
 set_option trace.compiler.ir true in
 @[noinline]
 def sum (l : List Nat) : Nat := Id.run do
@@ -25,6 +27,10 @@ def sum (l : List Nat) : Nat := Id.run do
     | .done _ =>
       break
   return sum
+
+end ListIterator
+
+section FilterMap
 
 set_option trace.compiler.ir.result true in
 @[noinline]
@@ -46,6 +52,10 @@ def forInItSum (l : List Nat) : Nat := Id.run do
     sum := sum + x
   return sum
 
+end FilterMap
+
+section FlatMap
+
 set_option trace.compiler.ir.result true in
 def testFlatMap (l : List (List Nat)) : Nat :=
   go (l.iter.flatMap fun l' => l'.iter) 0
@@ -66,6 +76,10 @@ def testFlatMap' (l : List (List Nat)) : Nat := Id.run do
   return sum
 
 #eval! testFlatMap [[1, 2], [3]]
+
+end FlatMap
+
+section IO
 
 set_option trace.compiler.ir.result true in
 def testIO (l : List Nat) : IO Unit :=
@@ -89,6 +103,10 @@ def testIOList : List Nat → IO Unit
     if x < 1 then IO.println x
     testIOList xs
 
+end IO
+
+section PlainListIteration
+
 set_option trace.compiler.ir true in
 @[noinline]
 def sum' (l : List Nat) : Nat := Id.run do
@@ -104,6 +122,8 @@ def sum' (l : List Nat) : Nat := Id.run do
 
 set_option trace.compiler.ir.result true in
 def sum'' (l : List Nat) : Nat := l.foldl (· + 2 * ·) 0
+
+end PlainListIteration
 
 def l := List.range 1000000
 
@@ -125,11 +145,13 @@ def runIO (name : String) (f : List Nat → IO Unit) : IO Unit := do
   timeit name <| runIOInternal f
 
 set_option trace.compiler.ir.result true in
+set_option trace.compiler.ir.result true in
 def Bench.main : IO Unit := do
-  for _ in [0:10] do
+  for _x : Nat in [0:10] do
     -- run "List.sum" sum''
     -- run "iterator recursion" sumrec
     runIO "it" testIO
     runIO "l" testIOList
+  return ()
 
 #eval Bench.main

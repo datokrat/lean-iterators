@@ -129,14 +129,17 @@ instance [Monad n] [Monad m] : Iterator (FilterMapH.{u'} α f mf) n β' :=
       (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
 
+@[inline]
 def Iterator.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : α) :
     FilterMapH.{u'} α f mf :=
   ⟨it⟩
 
+@[inline]
 def Iter.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
     Iter (α := FilterMapH.{u'} α f mf) n β' :=
   toIter <| Iterator.filterMapH f mf it.inner
 
+@[inline]
 def Iter.mapH [Monad n] [Monad m] [Iterator α m β] (f : β → β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
     Iter (α := FilterMapH.{u'} α (fun b => some <| f b) mf) n β' :=
   it.filterMapH (fun b => some <| f b) mf
@@ -182,6 +185,8 @@ instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Iterator (Flatten.{
   Iteration.instIterator fun
     | { it₁, it₂ := none } => flatMapStepNone it₁
     | { it₁, it₂ := some it₂ } => flatMapStepSome it₁ it₂
+
+instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Finite (Flatten.{u, v} α) := sorry
 
 @[inline]
 def Iter.flatten [Monad m] [i₁ : Iterator α m α'] [i₂ : Iterator α' m β] (it : Iter (α := α) m α') :=
