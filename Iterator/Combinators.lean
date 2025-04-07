@@ -313,11 +313,13 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {f : (b : β) → α'}
 
 @[inline]
-def Iter.flatMapH  (f : β → α') [Iterator α m β] (it : Iter (α := α) m β) [Iterator α' n β'] [Monad m] [Monad n] [Monad p]
+def Iter.flatMapH (f : β → α') [Iterator α m β] (it : Iter (α := α) m β) [Iterator α' n β'] [Monad m] [Monad n] [Monad p]
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
   it.mapH (fun b => IterULiftState.up.{max u v u' v'} (f b) fn) fm |>.flatten
 
 end Const
+
+section Dependent
 
 variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m]
   {α' : β → Type u'} {β' : Type v'} {n : Type max u' v' → Type max u' v'} [Monad n]
@@ -332,13 +334,17 @@ def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α :=
         (FilterMapH.{max u v u' v'} α (fun b => some (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn))) fm)) p β' :=
   it.mapH (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm |>.flatten
 
-end General
+end Dependent
 
-#exit
+section Simple
 
 @[inline]
-def Iter.flatMap [Monad m] [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :
-    Iter (α := FlatMap (Iter (α := α) m β) f) m β' :=
-  toIter <| FlatMap.init it f
+def Iter.flatMap {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
+    {α' : Type u} {β' : Type v} [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :=
+  Iter.flatMapH.{u, v, u, v} f it (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map)
+
+end Simple
+
+end General
 
 end FlatMap
