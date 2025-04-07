@@ -76,7 +76,7 @@ structure IterULiftState (α : Type u) (f : ∀ ⦃δ δ'⦄, (δ → δ') → m
   down : α
 
 @[inline]
-def IterULiftState.up (it : α) : IterULiftState.{u'} α f :=
+def IterULiftState.up (it : α) (f : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → n δ') : IterULiftState.{u'} α f :=
   ⟨it⟩
 
 instance [Monad n] [Iterator α m β] : Iterator (IterULiftState.{u'} α f) n β where
@@ -154,7 +154,7 @@ structure Flatten (α : Type u) {α' : Type u} {m : Type u → Type u} [Iterator
   it₂ : Option α'
 
 @[inline]
-def FlatMap.init (it : α) : Flatten α :=
+def Flatten.init {α : Type u} {α' : Type u} {m : Type u → Type u} [Iterator α m α'] (it : α) : Flatten α :=
   ⟨it, none⟩
 
 @[inline]
@@ -178,6 +178,10 @@ instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Iterator (Flatten �
   Iteration.instIterator fun
     | { it₁, it₂ := none } => flatMapStepNone it₁
     | { it₁, it₂ := some it₂ } => flatMapStepSome it₁ it₂
+
+@[inline]
+def Iter.flatten [Monad m] [Iterator α m α'] [Iterator α' m β] (it : Iter (α := α) m α') :=
+  toIter <| Flatten.init it.inner
 
 end Def
 
@@ -303,39 +307,30 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ'} {fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ'}
   {f : (b : β) → α'}
 
-def Iter.flatMapH  (f : β → α') (it : α) [Iterator α m β] [Iterator α' n β']
-    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') : Unit :=
-  let it := toIter it
-  let it := it.filterMapH (fun b => some <| Iter.uLiftState.{max u v u' v'} fn (toIter (f b))) fm
-  let it := it.filterMapH (fun b => some <| IterULiftState.up.{max u v u' v'} (f := fun {δ δ'} => fn (δ := δ) (δ' := δ')) (f b))
-  --let it' : FilterMapH.{u, max u v u' v', u, v} α (fun b => some <| IterULiftState.up.{max u u' v v', u', v'} (f := fn) <| f b) fm := ⟨it⟩
-  --let t := toIter it'
-  ()
+@[inline]
+def Iter.flatMapH  (f : β → α') [Iterator α m β] (it : Iter (α := α) m β) [Iterator α' n β'] [Monad m] [Monad n] [Monad p]
+    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
+  it.filterMapH (fun b => some <| IterULiftState.up.{max u v u' v'} (f b) fn) fm |>.flatten
 
 end Const
 
 variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m]
   {α' : β → Type u'} {β' : Type v'} {n : Type max u' v' → Type max u' v'} [Monad n]
   {p : Type max u v u' v' → Type max u v u' v'} [Monad p]
-  {fm : ∀ {δ δ'}, (δ → δ') → m δ → p δ'} {fn : ∀ {δ δ'}, (δ → δ') → n δ → p δ'}
+  {fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ'} {fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ'}
   {f : (b : β) → α' b}
 
-def convertInnerIterator (b : β) (it : α' b) [∀ b, Iterator (α' b) n β'] : SigmaIterator β α' :=
-  letI sigIt := SigmaIterator.mk b it
-  letI t := type_of% sigIt
-  letI : Iterator (SigmaIterator β α') _ _ := instIteratorSigmaIteratorOfMonad (m := n)
-  letI uit := IterULiftState.up.{max u' v v', v, max u' v} (f := fun {δ δ'} => fn (δ := δ) (δ' := δ')) sigIt
-  sorry
-
-def doLift (it : SigmaIterator β α') :=
-  IterULiftState.up
-
 set_option pp.universes true
-def Iter.flatMapHD (f : (b : β) → α' b) (it : α) [Iterator α m β] [∀ b, Iterator (α' b) n β']
-    (fm : ∀ {δ δ'}, (δ → δ') → m δ → p δ') (fn : ∀ {δ δ'}, (δ → δ') → m δ → p δ') : Unit :=
-  let nd : FilterMapH α (fun b => some <| IterULiftState.up.{u, v', max v u' v'} (f := fm) <| SigmaIterator.mk b (f b)) fm := ⟨it⟩
-  let h : Iterator (type_of% nd) p _ := inferInstance
+def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n]
+    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
+  haveI : ∀ b, Iterator (IterULiftState.{max u v u' v'}
+  let t := β → SigmaIterator β α'
+  let myf := fun b => SigmaIterator.mk b (f b)
+  let b : β := sorry
+  let i : Iterator (type_of% (myf b)) n β' := sorry --instIteratorSigmaIteratorOfMonad
+  let myf := fun b => some <| myf b
   ()
+  --it.filterMapH (fun b => some <| IterULiftState.up.{max u v u' v'} (SigmaIterator.mk b <| f b) fn) fm |>.flatten
 
 end General
 
