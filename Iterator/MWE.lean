@@ -70,31 +70,12 @@ structure Iteration (m : Type u → Type v) (γ : Type u) where
 
 @[inline]
 def Iteration.pure {γ m} [Pure m] (c : γ) : Iteration m γ :=
-  { prop c' := (c' = c), elem := Pure.pure ⟨c, sorry⟩ }
+  { prop c' := sorry, elem := Pure.pure ⟨c, sorry⟩ }
 
 @[inline]
 def Iteration.bind {γ δ m} [Monad m] (t : Iteration m γ) (f : γ → Iteration m δ) : Iteration m δ :=
-  { prop d := ∃ c, (f c).prop d ∧ t.prop c,
+  { prop d := d = d -- some nontrivial term (not sorry!) so that optimizations don't trigger
     elem := t.elem >>= (fun c => (fun x => ⟨x.1, sorry⟩) <$> (f c.1).elem) }
-
-@[inline]
-def Iteration.map {γ δ m} [Functor m] (f : γ → δ) (t : Iteration m γ) : Iteration m δ :=
-  { prop d := ∃ c, d = f c ∧ t.prop c,
-    elem := (fun c => ⟨f c.1, sorry⟩) <$> t.elem }
-
-@[inline]
-def Iteration.mapH {γ : Type u} {m : Type u → Type v}
-    {δ : Type u'} {n : Type u' → Type v'}
-    (f : γ → δ) (mf : ∀ {γ' : Type u} {δ' : Type u'}, (γ' → δ') → m γ' → n δ')
-    (t : Iteration m γ) : Iteration n δ :=
-  { prop d := ∃ c, d = f c ∧ t.prop c,
-    elem := mf (fun c => ⟨f c.1, sorry⟩) t.elem }
-
-instance (m) [Pure m] : Pure (Iteration m) where
-  pure := Iteration.pure
-
-instance (m) [Functor m] : Functor (Iteration m) where
-  map := Iteration.map
 
 instance (m) [Monad m] : Monad (Iteration m) where
   pure := Iteration.pure
@@ -107,7 +88,7 @@ def Iteration.step {α : Type u} {β : Type v} [Iterator α m β] [Functor m] (i
 
 @[inline]
 def Iteration.instIterator [Functor m] (stepFn : α → Iteration m (RawStep α β)) : Iterator α m β where
-  yielded it it' b := (stepFn it).prop (.yield it' b ⟨⟩)
+  yielded it it' b := sorry --(stepFn it).prop (.yield it' b ⟨⟩)
   skipped it it' := (stepFn it).prop (.skip it' ⟨⟩)
   finished it := (stepFn it).prop (.done ⟨⟩)
   step it := (match · with
@@ -127,57 +108,17 @@ end AbstractIteration
 
 section Combinators
 
-structure FlatMap (α β α' : Type) [Iterator α m β] (f : β → α') where
-  it₁ : α
-  it₂ : Option α'
-
-@[inline]
-def stepNone {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] (it₁ : α) {p₁ p₂ p₃} :
-    m (IterStep (FlatMap α β α' f) β' p₁ p₂ p₃) := do
-  match ← Iterator.step it₁ with
-  | .yield it₁' it₂' _ => pure <| .skip { it₁ := it₁', it₂ := some (f it₂') } sorry
-  | .skip it₁' _ => pure <| .skip { it₁ := it₁', it₂ := none } sorry
-  | .done _ => pure <| .done sorry
-
-instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap α β α' f) m β' where
-  yielded := sorry
-  skipped := sorry
-  finished := sorry
-  step
-    | { it₁, it₂ := none } => stepNone f it₁
-    | { it₁, it₂ := some it₂ } => do
-      match ← Iterator.step it₂ with
-      | .yield it₂' b _ => pure <| .yield { it₁ := it₁, it₂ := some it₂' } b sorry
-      | .skip it₂' _ => pure <| .skip { it₁ := it₁, it₂ := some it₂' } sorry
-      | .done _ => stepNone f it₁
-
 structure FlatMap2 (α β α' : Type) [Iterator α m β] (f : β → α') where
   it₂ : Option α'
-
--- instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap2 α β α' f) m β' :=
---   Iteration.instIterator fun
---     | { it₁, it₂ := none } =>
---       matchStep it₁
---         (fun it₁' b => pure <| .skip { it₁ := it₁', it₂ := some (f b) } ⟨⟩)
---         (fun it₁' => pure <| .skip { it₁ := it₁', it₂ := none } ⟨⟩)
---         (pure <| .done ⟨⟩)
---     | { it₁, it₂ := some it₂ } =>
---       matchStep it₂
---         (fun it₂' b => pure <| .yield { it₁ := it₁, it₂ := some it₂' } b ⟨⟩)
---         (fun it₂' => pure <| .skip { it₁ := it₁, it₂ := some it₂' } ⟨⟩)
---         (matchStep it₁
---           (fun it₁' b => pure <| .skip { it₁ := it₁', it₂ := some (f b) } ⟨⟩)
---           (fun it₁' => pure <| .skip { it₁ := it₁', it₂ := none } ⟨⟩)
---           (pure <| .done ⟨⟩))
 
 instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap2 α β α' f) m β' :=
   Iteration.instIterator fun
     | { it₂ := none } => pure <| .done ⟨⟩
-    | { it₂ := some it₂ } =>
-      matchStep it₂
-        (fun it₂' b => pure <| .yield { it₂ := some it₂' } b ⟨⟩)
-        (fun it₂' => pure <| .skip { it₂ := some it₂' } ⟨⟩)
-        (pure <| .done ⟨⟩)
+    | { it₂ := some it₂ } => do
+      match ← Iteration.step it₂ with
+      | .yield it' b _ => ⟨fun _ => True, pure <| ⟨.yield { it₂ := some it' } b ⟨⟩, sorry⟩⟩
+      | .skip it' _ => ⟨fun _ => True, pure <| ⟨.skip { it₂ := some it' } ⟨⟩, sorry⟩⟩
+      | .done _ => ⟨fun _ => True, pure <| ⟨.done ⟨⟩, sorry⟩⟩
 
 end Combinators
 
