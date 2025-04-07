@@ -325,20 +325,13 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ'} {fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ'}
   {f : (b : β) → α' b}
 
-set_option pp.universes true
+@[inline]
 def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n] [Monad p]
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :
-    @Iter.{v', max (max u v u' v') v', max (max u v u' v') v'}
-  (Flatten.{max (max u v u' v') v'}
-    (FilterMapH.{max u v u' v'} α
-      (fun b =>
-        some
-          (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)))
-      fm))
-  p β' inferInstance :=
-  Iter.flatten.{max u v u' v', v'}
-    (Iter.mapH.{max u v u' v', max u v u' v', u, v}
-      (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm it)
+    Iter (α := Flatten.{max (max u v u' v') v'}
+        (FilterMapH.{max u v u' v'} α (fun b => some (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn))) fm)) p β' :=
+  (Iter.mapH.{max u v u' v', max u v u' v', u, v}
+    (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm it).flatten
 
 end General
 
