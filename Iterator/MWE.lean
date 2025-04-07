@@ -18,26 +18,6 @@ class Iterator (α : Type u) (m : outParam (Type (max u v) → Type x)) (β : ou
   finished : α → Prop
   step : (a : α) → m (IterStep α β (yielded a) (skipped a) (finished a))
 
-section Finite
-
-structure FiniteIteratorWF (α : Type u) [Iterator α m β] where
-  inner : α
-
-def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α) : Prop :=
-  (∃ b, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped y.inner x.inner
-
-def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α :=
-  ⟨it⟩
-
-class Finite (α) [Iterator α m β] : Prop where
-  wf : WellFounded (FiniteIteratorWF.lt (α := α))
-
-instance [Iterator α m β] [Finite α] : WellFoundedRelation (FiniteIteratorWF α) where
-  rel := FiniteIteratorWF.lt
-  wf := Finite.wf
-
-macro_rules | `(tactic| decreasing_trivial) => `(tactic| first | exact Or.inl ⟨_, ‹_›⟩ | exact Or.inr ‹_›)
-
 section Wrapper
 
 structure Iter (m) (β : Type v) [Iterator α m β] where
@@ -55,9 +35,6 @@ instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m 
     | .yield it' x h => .yield ⟨it'⟩ x h
     | .skip it' h => .skip ⟨it'⟩ h
     | .done h => .done h) <$> (Iterator.step it.inner)
-
-instance [Functor m] [Iterator α m β] [Finite α] : Finite (Iter (α := α) m β) where
-  wf := InvImage.wf (finiteIteratorWF ∘ Iter.inner ∘ FiniteIteratorWF.inner) Finite.wf
 
 end Wrapper
 
@@ -78,18 +55,6 @@ instance [Pure m] : Iterator (ListIterator α m) m α where
 
 def List.iter {α} (l : List α) (m := Id) [Pure m] : Iter (α := ListIterator α m) m α :=
   toIter { list := l }
-
-theorem test [Pure m] :
-    Subrelation (FiniteIteratorWF.lt (α := ListIterator α m))
-      (InvImage WellFoundedRelation.rel (ListIterator.list ∘ FiniteIteratorWF.inner)) := by
-  intro x y hlt
-  simp_wf
-  simp only [FiniteIteratorWF.lt, Iterator.yielded, Iterator.skipped, or_false] at hlt
-  cases hlt
-  simp_all
-
-instance [Pure m] : Finite (ListIterator α m) where
-  wf := test.wf (InvImage.wf _ WellFoundedRelation.wf)
 
 end ListIterator
 
@@ -186,11 +151,7 @@ instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β 
       | .skip it₂' _ => pure <| .skip { it₁ := it₁, it₂ := some it₂' } sorry
       | .done _ => stepNone f it₁
 
-instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Finite (FlatMap α β α' f) where
-  wf := sorry
-
 structure FlatMap2 (α β α' : Type) [Iterator α m β] (f : β → α') where
-  it₁ : α
   it₂ : Option α'
 
 -- instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap2 α β α' f) m β' :=
@@ -211,15 +172,12 @@ structure FlatMap2 (α β α' : Type) [Iterator α m β] (f : β → α') where
 
 instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap2 α β α' f) m β' :=
   Iteration.instIterator fun
-    | { it₁ := _, it₂ := none } => pure <| .done ⟨⟩
-    | { it₁, it₂ := some it₂ } =>
+    | { it₂ := none } => pure <| .done ⟨⟩
+    | { it₂ := some it₂ } =>
       matchStep it₂
-        (fun it₂' b => pure <| .yield { it₁ := it₁, it₂ := some it₂' } b ⟨⟩)
-        (fun it₂' => pure <| .skip { it₁ := it₁, it₂ := some it₂' } ⟨⟩)
+        (fun it₂' b => pure <| .yield { it₂ := some it₂' } b ⟨⟩)
+        (fun it₂' => pure <| .skip { it₂ := some it₂' } ⟨⟩)
         (pure <| .done ⟨⟩)
-
-instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Finite (FlatMap2 α β α' f) where
-  wf := sorry
 
 end Combinators
 
@@ -227,7 +185,7 @@ section IR
 
 set_option trace.compiler.ir.result true in
 def testFlatMap (l : List (List Nat)) : Nat :=
-  go (FlatMap2.mk (f := List.iter) l.iter none) 0
+  go (FlatMap2.mk (α := ListIterator (List Nat) Id) (f := List.iter) none) 0
 where
   @[specialize]
   go it acc :=
@@ -235,6 +193,9 @@ where
     | .yield it' n _ => go it' (acc + n)
     | .skip it' _ => go it' acc
     | .done _ => acc
-  termination_by finiteIteratorWF it
+  termination_by it
+  decreasing_by
+    · sorry
+    · sorry
 
 end IR
