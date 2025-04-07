@@ -137,6 +137,10 @@ def Iter.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β
     Iter (α := FilterMapH.{u'} α f mf) n β' :=
   toIter <| Iterator.filterMapH f mf it.inner
 
+def Iter.mapH [Monad n] [Monad m] [Iterator α m β] (f : β → β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
+    Iter (α := FilterMapH.{u'} α (fun b => some <| f b) mf) n β' :=
+  it.filterMapH (fun b => some <| f b) mf
+
 end MapH
 
 section FlatMap
@@ -180,7 +184,7 @@ instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Iterator (Flatten �
     | { it₁, it₂ := some it₂ } => flatMapStepSome it₁ it₂
 
 @[inline]
-def Iter.flatten [Monad m] [Iterator α m α'] [Iterator α' m β] (it : Iter (α := α) m α') :=
+def Iter.flatten [Monad m] [i₁ : Iterator α m α'] [i₂ : Iterator α' m β] (it : Iter (α := α) m α') :=
   toIter <| Flatten.init it.inner
 
 end Def
@@ -289,8 +293,9 @@ structure SigmaIterator (β : Type u) (α : β → Type v) where
   b : β
   inner : α b
 
-instance {β : Type u} {α : β → Type v} {m : Type max u v → Type max u v} [Monad m]
-    [∀ b, Iterator (α b) m γ] : Iterator (SigmaIterator β α) m γ :=
+instance {β : Type u} {α : β → Type max u v} {γ : Type w}
+    {m : Type max u v w → Type max u v w} [Monad m]
+    [i : ∀ b, Iterator (α b) m γ] : Iterator (SigmaIterator β α) m γ :=
   Iteration.instIterator fun it => do
     matchStep it.inner
       (fun it' c => pure <| .yield ⟨it.b, it'⟩ c ⟨⟩)
@@ -321,16 +326,27 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {f : (b : β) → α' b}
 
 set_option pp.universes true
-def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n]
-    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
-  haveI : ∀ b, Iterator (IterULiftState.{max u v u' v'}
-  let t := β → SigmaIterator β α'
-  let myf := fun b => SigmaIterator.mk b (f b)
-  let b : β := sorry
-  let i : Iterator (type_of% (myf b)) n β' := sorry --instIteratorSigmaIteratorOfMonad
-  let myf := fun b => some <| myf b
-  ()
-  --it.filterMapH (fun b => some <| IterULiftState.up.{max u v u' v'} (SigmaIterator.mk b <| f b) fn) fm |>.flatten
+def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n] [Monad p]
+    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :
+    @Iter.{v', max (max u v u' v') v', max (max u v u' v') v'}
+  (Flatten.{max (max u v u' v') v'}
+    (FilterMapH.{max u v u' v'} α
+      (fun b =>
+        some
+          (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)))
+      fm))
+  p β' (@instIteratorFlattenOfMonad.{max u v u' v'}
+  (FilterMapH.{max u v u' v'} α
+    (fun b =>
+      some
+        (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)))
+    fm)
+  (SigmaIterator β fun b => IterULiftState.{max u v u' v', v', u'} (α' b) fn) β' p inferInstance
+  inferInstance
+  instIteratorSigmaIteratorOfMonad.{v, max u v u' v'}) :=
+  Iter.flatten.{max u v u' v', v'}
+    (Iter.mapH.{max u v u' v', max u v u' v', u, v}
+      (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm it)
 
 end General
 
