@@ -30,6 +30,14 @@ def Iteration.map {γ δ m} [Functor m] (f : γ → δ) (t : Iteration m γ) : I
   { prop d := ∃ c, d = f c ∧ t.prop c,
     elem := (fun c => ⟨f c.1, ⟨c.1, rfl, c.2⟩⟩) <$> t.elem }
 
+@[inline]
+def Iteration.mapH {γ : Type u} {m : Type u → Type v}
+    {δ : Type u'} {n : Type u' → Type v'}
+    (f : γ → δ) (mf : ∀ {γ' : Type u} {δ' : Type u'}, (γ' → δ') → m γ' → n δ')
+    (t : Iteration m γ) : Iteration n δ :=
+  { prop d := ∃ c, d = f c ∧ t.prop c,
+    elem := mf (fun c => ⟨f c.1, ⟨c.1, rfl, c.2⟩⟩) t.elem }
+
 instance (m) [Pure m] : Pure (Iteration m) where
   pure := Iteration.pure
 
@@ -65,11 +73,20 @@ def Iteration.instIterator [Functor m] (stepFn : α → Iteration m (RawStep α 
 @[inline]
 def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
     (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
-  haveI := Iteration.step (α := α) (m := m) (β := β) it
   match ← Iteration.step it with
   | .yield it' b _ => yield it' b
   | .skip it' _ => skip it'
   | .done _ => done
+
+@[inline]
+def matchStepH.{w} {α : Type u} {β : Type v} [Iterator α m β] {γ : Type (max u v w)} [Functor m]
+    (mf : ∀ {γ' : Type max u v} {δ' : Type max u v w}, (γ' → δ') → m γ' → n δ') [Monad n]
+    (it : α)
+    (yield : α → β → Iteration n γ) (skip : α → Iteration n γ) (done : Iteration n γ) := do
+  match ← Iteration.mapH ULift.up mf (Iteration.step it) with
+  | ⟨.yield it' b _⟩ => yield it' b
+  | ⟨.skip it' _⟩ => skip it'
+  | ⟨.done _⟩ => done
 
 theorem finite_instIterator {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)} [Functor m]
     (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
