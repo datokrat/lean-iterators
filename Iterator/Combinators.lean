@@ -288,8 +288,8 @@ Plan:
 section General
 
 section Helper
-
-structure SigmaIterator (β : Type u) (α : β → Type v) where
+set_option pp.universes true
+structure SigmaIterator (β : Type u) (α : β → Type max u v) where
   b : β
   inner : α b
 
@@ -343,7 +343,7 @@ def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α :=
     fm)
   (SigmaIterator β fun b => IterULiftState.{max u v u' v', v', u'} (α' b) fn) β' p inferInstance
   inferInstance
-  instIteratorSigmaIteratorOfMonad.{v, max u v u' v'}) :=
+  inferInstance) :=
   Iter.flatten.{max u v u' v', v'}
     (Iter.mapH.{max u v u' v', max u v u' v', u, v}
       (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm it)
