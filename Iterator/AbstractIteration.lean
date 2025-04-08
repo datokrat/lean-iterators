@@ -12,6 +12,7 @@ abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
 
 abbrev IterStep.for {α β m} [Iterator α m β] (it : α) := IterStep α β (Iterator.yielded it) (Iterator.skipped it) (Iterator.finished it)
 
+@[ext]
 structure Iteration (m : Type u → Type v) (γ : Type u) where
   prop : γ → Prop
   elem : m { c // prop c }
@@ -71,14 +72,6 @@ def Iteration.instIterator [Functor m] (stepFn : α → Iteration m (RawStep α 
     | ⟨.done _, h⟩ => .done h) <$> (stepFn it).elem
 
 @[inline]
-def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
-    (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
-  match ← Iteration.step it with
-  | .yield it' b _ => yield it' b
-  | .skip it' _ => skip it'
-  | .done _ => done
-
-@[inline]
 def matchStepH.{w} {α : Type u} {β : Type v} [Iterator α m β] {γ : Type (max u v w)} [Functor m]
     (mf : ∀ {γ' : Type max u v} {δ' : Type max u v w}, (γ' → δ') → m γ' → n δ') [Monad n]
     (it : α)
@@ -87,6 +80,17 @@ def matchStepH.{w} {α : Type u} {β : Type v} [Iterator α m β] {γ : Type (ma
   | ⟨.yield it' b _⟩ => yield it' b
   | ⟨.skip it' _⟩ => skip it'
   | ⟨.done _⟩ => done
+
+@[inline]
+def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
+    (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) :=
+  matchStepH.{u} (n := m) Functor.map it yield skip done
+
+  --   do
+  -- match ← Iteration.step it with
+  -- | .yield it' b _ => yield it' b
+  -- | .skip it' _ => skip it'
+  -- | .done _ => done
 
 theorem finite_instIterator {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)} [Functor m]
     (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
@@ -126,18 +130,27 @@ theorem Iteration.prop_map {α β m} [Functor m] (f : α → β) (t : Iteration 
     (f <$> t).prop b ↔ ∃ a, b = f a ∧ t.prop a :=
   Iff.rfl
 
-theorem prop_successor_matchStep {α β γ} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
+theorem prop_successor_matchStepH.{w} {α : Type u} {β : Type v} {γ : Type (max u v w)} {m} [Monad m] [Iterator α m β]
+    {mf : ∀ {γ' : Type max u v} {δ' : Type max u v w}, (γ' → δ') → m γ' → n δ'} [Monad n] {it : α} {yield skip done}
     {f : γ → δ} {x : δ}
-    (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) :
+    (h : (f <$> matchStepH (γ := γ) mf it yield skip done).prop x) :
     (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
     (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').prop x) ∨
     (Iterator.finished it ∧ (f <$> done).prop x) := by
-  simp only [Iteration.prop_map, matchStep, Iteration.prop_bind] at h
+  simp only [Iteration.prop_map, matchStepH, Iteration.prop_bind] at h
   obtain ⟨c, rfl, _, h, h'⟩ := h
   split at h
   · exact Or.inl ⟨_, _, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
+
+theorem prop_successor_matchStep {α β γ} {m} [Monad m] [Iterator α m β] {it : α} {yield skip done}
+    {f : γ → δ} {x : δ}
+    (h : (f <$> matchStep (γ := γ) it yield skip done).prop x) :
+    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
+    (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').prop x) ∨
+    (Iterator.finished it ∧ (f <$> done).prop x) :=
+  prop_successor_matchStepH h
 
 theorem successor_skip {α β m} [Functor m] [Pure m] [Iterator α m β] {it₁ it₂ : α} :
     (IterStep.successor <$> pure (f := Iteration m) (IterStep.skip it₁ True.intro : RawStep α β)).prop (some it₂) ↔

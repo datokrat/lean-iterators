@@ -8,34 +8,35 @@ import Iterator.Wrapper
 import Iterator.AbstractIteration
 import Iterator.IteratorMorphism
 
-section FilterMap
+section FilterMapH
 
--- todo: more universe polymorphism
-variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f : β → Option γ}
+universe u' v' u v
 
-variable (α) in
-structure FilterMap (f : β → Option γ) where
+structure FilterMapH (α : Type u) {β : Type v} {m : Type max u v → Type max u v} [Iterator α m β]
+    {β' : Type v'} (f : β → Option β') {n : Type max u u' v v' → Type max u u' v v'}
+    (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') : Type max u u' v where
   inner : α
 
--- @[inline]
--- def Iteration.instIterator' {α : Type u} {β : Type v} [Functor m] (stepFn : α → Iteration m (RawStep α β)) : Iterator α m β where
+variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
+    {β' : Type v'} {f : β → Option β'} {n : Type max u u' v v' → Type max u u' v v'} [Monad n]
+    {mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ'}
 
-instance [Iterator α m β] [Monad m] : Iterator (FilterMap α f) m γ :=
-  Iteration.instIterator fun it => do
-    matchStep it.inner
-      (fun it' b => pure <| match f b with
-          | none => IterStep.skip ⟨it'⟩ ⟨⟩
-          | some c => IterStep.yield ⟨it'⟩ c ⟨⟩)
-      (fun it' => pure <| IterStep.skip ⟨it'⟩ ⟨⟩)
-      (pure <| IterStep.done ⟨⟩)
+instance : Iterator (FilterMapH.{u'} α f mf) n β' :=
+  Iteration.instIterator fun it =>
+    matchStepH.{max u' v'} (fun {δ δ'} => mf (δ := δ) (δ' := δ')) it.inner
+      (fun it' b => match f b with
+        | none => pure <| .skip ⟨it'⟩ ⟨⟩
+        | some c => pure <| .yield ⟨it'⟩ c ⟨⟩)
+      (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
+      (pure <| .done ⟨⟩)
 
-instance [Iterator α m β] [Monad m] [Finite α] : Finite (FilterMap α f) := by
-  refine finite_instIterator (α := FilterMap α f) (β := γ) (m := m) (rel := ?_) ?_ ?_ ?_
-  · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMap.inner)
+instance [Finite α] : Finite (FilterMapH.{u'} α f mf) := by
+  refine finite_instIterator (α := FilterMapH.{u'} α f mf) (β := β') (m := n) (rel := ?_) ?_ ?_ ?_
+  · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMapH.inner)
   · apply InvImage.wf
     exact Finite.wf
   · intro it it' h
-    replace h := prop_successor_matchStep h
+    replace h := prop_successor_matchStepH h
     obtain ⟨it'', b, h, h'⟩ | ⟨it'', h, h'⟩ | ⟨h, h'⟩ := h
     · split at h'
       · cases up_successor_skip.mp h'
@@ -47,19 +48,42 @@ instance [Iterator α m β] [Monad m] [Finite α] : Finite (FilterMap α f) := b
     · cases up_successor_done.mp h'
 
 @[inline]
-def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :
-    Iter (α := FilterMap (Iter (α := α) m β) f) m γ :=
-  toIter ⟨it⟩
+def Iterator.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : α) :
+    FilterMapH.{u'} α f mf :=
+  ⟨it⟩
 
 @[inline]
-def Iter.map [Iterator α m β] [Monad m] (f : β → γ) (it : Iter (α := α) m β) :
-    Iter (α := FilterMap (Iter (α := α) m β) (some ∘ f)) m γ :=
-  toIter ⟨it⟩
+def Iter.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
+    Iter (α := FilterMapH.{u'} α f mf) n β' :=
+  toIter <| Iterator.filterMapH f mf it.inner
 
 @[inline]
-def Iter.filter [Iterator α m β] [Monad m] (f : β → Bool) (it : Iter (α := α) m β) :
-    Iter (α := FilterMap (Iter (α := α) m β) (fun x => if f x then some x else none)) m β :=
-  toIter ⟨it⟩
+def Iter.mapH [Monad n] [Monad m] [Iterator α m β] (f : β → β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
+    Iter (α := FilterMapH.{u'} α (fun b => some <| f b) mf) n β' :=
+  it.filterMapH (fun b => some <| f b) mf
+
+end FilterMapH
+
+section FilterMap
+
+-- todo: more universe polymorphism
+variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f : β → Option γ}
+
+variable (α) in
+structure FilterMap (f : β → Option γ) where
+  inner : α
+
+@[inline]
+def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :=
+  it.filterMapH f (m := m) (fun ⦃_ _⦄ => Functor.map)
+
+@[inline]
+def Iter.map [Iterator α m β] [Monad m] (f : β → γ) (it : Iter (α := α) m β) :=
+  it.filterMap (some ∘ f)
+
+@[inline]
+def Iter.filter [Iterator α m β] [Monad m] (f : β → Bool) (it : Iter (α := α) m β) :=
+  it.filterMap (fun x => if f x then some x else none)
 
 end FilterMap
 
@@ -106,45 +130,6 @@ instance [Monad n] [Iterator α m β] [Finite α] : Finite (IterULiftState.{u'} 
   IterULiftState.downMorphism.pullbackFinite
 
 end ULiftState
-
-section MapH
-
-universe u' v' u v
-
-structure FilterMapH (α : Type u) {β : Type v} {m : Type max u v → Type max u v} [Iterator α m β]
-    {β' : Type v'} (f : β → Option β') {n : Type max u u' v v' → Type max u u' v v'}
-    (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') : Type max u u' v where
-  inner : α
-
-variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Iterator α m β]
-    {β' : Type v'} {f : β → Option β'} {n : Type max u u' v v' → Type max u u' v v'}
-    {mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ'}
-
-instance [Monad n] [Monad m] : Iterator (FilterMapH.{u'} α f mf) n β' :=
-  Iteration.instIterator fun it =>
-    matchStepH.{max u' v'} (fun {δ δ'} => mf (δ := δ) (δ' := δ')) it.inner
-      (fun it' b => match f b with
-        | none => pure <| .skip ⟨it'⟩ ⟨⟩
-        | some c => pure <| .yield ⟨it'⟩ c ⟨⟩)
-      (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
-
-@[inline]
-def Iterator.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : α) :
-    FilterMapH.{u'} α f mf :=
-  ⟨it⟩
-
-@[inline]
-def Iter.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
-    Iter (α := FilterMapH.{u'} α f mf) n β' :=
-  toIter <| Iterator.filterMapH f mf it.inner
-
-@[inline]
-def Iter.mapH [Monad n] [Monad m] [Iterator α m β] (f : β → β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
-    Iter (α := FilterMapH.{u'} α (fun b => some <| f b) mf) n β' :=
-  it.filterMapH (fun b => some <| f b) mf
-
-end MapH
 
 section FlatMap
 
