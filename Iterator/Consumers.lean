@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.Basic
+import Iterator.Wrapper
 
 @[specialize]
 def Iterator.forIn {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α]
@@ -30,3 +30,48 @@ def Iterator.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterato
   | .skip it' _ => Iterator.fold f init it'
   | .done _ => return init
 termination_by finiteIteratorWF it
+
+@[inline]
+def Iter.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α]
+    (f : γ → β → n γ) (init : γ) (it : Iter (α := α) m β) : n γ :=
+  Iterator.fold f init it.inner
+
+@[inline]
+def Iterator.toArray [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (Array β) :=
+  go it #[]
+where
+  @[specialize]
+  go [Finite α] (it : α) a := do
+    match ← Iterator.step it with
+    | .yield it' b _ => go it' (a.push b)
+    | .skip it' _ => go it' a
+    | .done _ => return a
+  termination_by finiteIteratorWF it
+
+@[inline]
+def Iter.toArray [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (Array β) :=
+  Iterator.toArray it
+
+@[inline]
+def Iterator.reverseToList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (List β) :=
+  go it []
+where
+  @[specialize]
+  go [Finite α] (it : α) bs := do
+    match ← Iterator.step it with
+    | .yield it' b _ => go it' (b :: bs)
+    | .skip it' _ => go it' bs
+    | .done _ => return bs
+  termination_by finiteIteratorWF it
+
+@[inline]
+def Iter.reverseToList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (List β) :=
+  Iterator.reverseToList it
+
+@[inline]
+def Iterator.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (List β) :=
+  Array.toList <$> Iterator.toArray it
+
+@[inline]
+def Iter.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (List β) :=
+  Iterator.toList it
