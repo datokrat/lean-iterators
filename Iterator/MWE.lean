@@ -46,13 +46,14 @@ structure ListIterator (α : Type u) (m : Type u → Type u) where
   list : List α
 
 instance [Pure m] : Iterator (ListIterator α m) m α where
-  yielded it it' a := it.list = a :: it'.list
-  skipped it it' := False
-  finished it := it.list = []
+  yielded it it' a := sorry
+  skipped it it' := sorry
+  finished it := sorry
   step
-    | { list := .nil } => pure <| .done rfl
-    | { list := x :: xs } => pure <| .yield { list := xs } x (by simp)
+    | { list := .nil } => pure <| .done sorry
+    | { list := x :: xs } => pure <| .yield { list := xs } x sorry
 
+@[inline]
 def List.iter {α} (l : List α) (m := Id) [Pure m] : Iter (α := ListIterator α m) m α :=
   toIter { list := l }
 
@@ -75,7 +76,7 @@ def Iteration.pure {γ m} [Pure m] (c : γ) : Iteration m γ :=
 @[inline]
 def Iteration.bind {γ δ m} [Monad m] (t : Iteration m γ) (f : γ → Iteration m δ) : Iteration m δ :=
   { prop d := d = d -- some nontrivial term (not sorry!) so that optimizations don't trigger
-    elem := t.elem >>= (fun c => (fun x => ⟨x.1, sorry⟩) <$> (f c.1).elem) }
+    elem := do (fun x => ⟨x.1, sorry⟩) <$> (f (← t.elem).val).elem }
 
 instance (m) [Monad m] : Monad (Iteration m) where
   pure := Iteration.pure
@@ -96,29 +97,21 @@ def Iteration.instIterator [Functor m] (stepFn : α → Iteration m (RawStep α 
     | ⟨.skip it' _, h⟩ => .skip it' h
     | ⟨.done _, h⟩ => .done h) <$> (stepFn it).elem
 
-@[inline]
-def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
-    (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) := do
-  match ← Iteration.step it with
-  | .yield it' b _ => yield it' b
-  | .skip it' _ => skip it'
-  | .done _ => done
-
 end AbstractIteration
 
 section Combinators
 
-structure FlatMap2 (α β α' : Type) [Iterator α m β] (f : β → α') where
+structure FlatMap2 (α β α' : Type) [Iterator α Id β] (f : β → α') where
   it₂ : Option α'
 
-instance {α β α' β' : Type} [Iterator α m β] [Iterator α' m β'] (f : β → α') [Monad m] : Iterator (FlatMap2 α β α' f) m β' :=
+instance {α β α' β' : Type} [Iterator α Id β] [Iterator α' Id β'] (f : β → α') : Iterator (FlatMap2 α β α' f) Id β' :=
   Iteration.instIterator fun
     | { it₂ := none } => pure <| .done ⟨⟩
     | { it₂ := some it₂ } => do
-      match ← Iteration.step it₂ with
-      | .yield it' b _ => ⟨fun _ => True, pure <| ⟨.yield { it₂ := some it' } b ⟨⟩, sorry⟩⟩
-      | .skip it' _ => ⟨fun _ => True, pure <| ⟨.skip { it₂ := some it' } ⟨⟩, sorry⟩⟩
-      | .done _ => ⟨fun _ => True, pure <| ⟨.done ⟨⟩, sorry⟩⟩
+      ⟨fun _ => True, match ← { prop := sorry, elem := ⟨Iterator.step it₂, sorry⟩ } with
+      | .yield it' b _ => ⟨.yield { it₂ := some it' } b ⟨⟩, sorry⟩
+      | .skip it' _ => ⟨.skip { it₂ := some it' } ⟨⟩, sorry⟩
+      | .done _ => ⟨.done ⟨⟩, sorry⟩⟩
 
 end Combinators
 
