@@ -66,12 +66,7 @@ end FilterMapH
 
 section FilterMap
 
--- todo: more universe polymorphism
 variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f : β → Option γ}
-
-variable (α) in
-structure FilterMap (f : β → Option γ) where
-  inner : α
 
 @[inline]
 def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :=
@@ -133,7 +128,7 @@ end ULiftState
 
 section FlatMap
 
-section Def
+section FlattenDef
 
 universe u v
 
@@ -150,7 +145,7 @@ def Flatten.init {α α' : Type max u v} {m : Type max u v → Type max u v} [It
   ⟨it, none⟩
 
 @[inline]
-def flatMapStepNone [Monad m] [Iterator α m α'] [Iterator α' m β] (it₁ : α) :
+def flattenStepNone [Monad m] [Iterator α m α'] [Iterator α' m β] (it₁ : α) :
     Iteration m (RawStep (Flatten.{u, v} α) β) :=
   matchStep it₁
     (fun it₁' b => pure <| .skip { it₁ := it₁', it₂ := some b } ⟨⟩)
@@ -159,51 +154,50 @@ def flatMapStepNone [Monad m] [Iterator α m α'] [Iterator α' m β] (it₁ : �
 
 variable (f) in
 @[inline]
-def flatMapStepSome [Monad m] [Iterator α m α'] [Iterator α' m β] (it₁ : α) (it₂ : α') :
+def flattenStepSome [Monad m] [Iterator α m α'] [Iterator α' m β] (it₁ : α) (it₂ : α') :
     Iteration m (RawStep (Flatten.{u, v} α) β) :=
   matchStep.{max u v, v} it₂
     (fun it₂' b => pure <| .yield { it₁ := it₁, it₂ := some it₂' } b ⟨⟩)
     (fun it₂' => pure <| .skip { it₁ := it₁, it₂ := some it₂' } ⟨⟩)
-    (flatMapStepNone it₁)
+    (flattenStepNone it₁)
 
 instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Iterator (Flatten.{u, v} α) m β :=
   Iteration.instIterator fun
-    | { it₁, it₂ := none } => flatMapStepNone it₁
-    | { it₁, it₂ := some it₂ } => flatMapStepSome it₁ it₂
-
-instance [Monad m] [Iterator α m α'] [Iterator α' m β] : Finite (Flatten.{u, v} α) := sorry
+    | { it₁, it₂ := none } => flattenStepNone it₁
+    | { it₁, it₂ := some it₂ } => flattenStepSome it₁ it₂
 
 @[inline]
 def Iter.flatten [Monad m] [i₁ : Iterator α m α'] [i₂ : Iterator α' m β] (it : Iter (α := α) m α') :=
   toIter <| Flatten.init it.inner
 
-end Def
+end FlattenDef
 
-section UniverseMonomorphic
+section Finite
 
-universe u
+universe u v
 
-variable {α α' β' : Type u} {m : Type u → Type u}
+variable {α α' : Type max u v} {β : Type v} {m : Type max u v → Type max u v}
 
-def FlatMap.lex [Iterator α m α'] (r₁ : α → α → Prop) (r₂ : α' → α' → Prop) : Flatten.{u, u} α → Flatten.{u, u} α → Prop :=
+def Flatten.lex [Iterator α m α'] (r₁ : α → α → Prop) (r₂ : α' → α' → Prop) : Flatten.{u, v} α → Flatten.{u, v} α → Prop :=
   InvImage (Prod.Lex r₁ (Option.lt r₂)) (fun it => (it.it₁, it.it₂))
 
-theorem FlatMap.lex_of_left [Iterator α m α'] {r₁ : α → α → Prop} {r₂ : α' → α' → Prop} {it it'}
-    (h : r₁ it'.it₁ it.it₁) : FlatMap.lex r₁ r₂ it' it :=
+theorem Flatten.lex_of_left [Iterator α m α'] {r₁ : α → α → Prop} {r₂ : α' → α' → Prop} {it it'}
+    (h : r₁ it'.it₁ it.it₁) : Flatten.lex.{u, v} r₁ r₂ it' it :=
   Prod.Lex.left _ _ h
 
-theorem FlatMap.lex_of_right [Iterator α m α'] {r₁ : α → α → Prop} {r₂ : α' → α' → Prop} {it₁ it₂ it₂'}
-    (h : r₂ it₂' it₂) : FlatMap.lex r₁ r₂ ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
+theorem Flatten.lex_of_right [Iterator α m α'] {r₁ : α → α → Prop} {r₂ : α' → α' → Prop} {it₁ it₂ it₂'}
+    (h : r₂ it₂' it₂) : Flatten.lex.{u, v} r₁ r₂ ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
   Prod.Lex.right _ h
 
-def rel [Iterator α m α'] [Iterator α' m β] : Flatten.{u, u} α → Flatten.{u, u} α → Prop :=
-  FlatMap.lex (InvImage FiniteIteratorWF.lt finiteIteratorWF) (InvImage FiniteIteratorWF.lt finiteIteratorWF)
+def rel [Iterator α m α'] [Iterator α' m β] : Flatten.{u, v} α → Flatten.{u, v} α → Prop :=
+  Flatten.lex (InvImage FiniteIteratorWF.lt finiteIteratorWF) (InvImage FiniteIteratorWF.lt finiteIteratorWF)
 
-theorem descending_flatMapStepNone
+set_option pp.universes true in
+theorem descending_flattenStepNone
     [Monad m] [Iterator α m α'] [Iterator α' m β] {it₁ : α} {it' : Flatten α}
-    (h : ((ULift.up ∘ IterStep.successor) <$> flatMapStepNone it₁).prop (ULift.up <| some it')) :
+    (h : ((ULift.up.{v} ∘ IterStep.successor) <$> flattenStepNone it₁).prop (ULift.up <| some it')) :
     (finiteIteratorWF (m := m) it'.it₁).lt (finiteIteratorWF it₁) := by
-  simp only [flatMapStepNone] at h
+  simp only [flattenStepNone] at h
   have := prop_successor_matchStep h
   obtain ⟨it'', b, hy, h⟩ | ⟨it'', hs, h⟩ | ⟨hd, h⟩ := this
   · cases up_successor_skip.mp h
@@ -212,20 +206,20 @@ theorem descending_flatMapStepNone
     exact Or.inr hs
   · cases up_successor_done.mp h
 
-theorem descending_flatMapStepSome
+theorem descending_flattenStepSome
     [Monad m] [Iterator α m α'] [Iterator α' m β] {it₁ : α} {it₂ : α'} {it' : Flatten α}
-    (h : ((ULift.up ∘ IterStep.successor) <$> flatMapStepSome it₁ it₂).prop (ULift.up <| some it')) :
+    (h : ((ULift.up.{v} ∘ IterStep.successor) <$> flattenStepSome it₁ it₂).prop (ULift.up <| some it')) :
     rel it' { it₁ := it₁, it₂ := some it₂ } := by
-  simp only [flatMapStepSome] at h
+  simp only [flattenStepSome] at h
   obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep h
   · cases up_successor_yield.mp h
-    apply FlatMap.lex_of_right
+    apply Flatten.lex_of_right
     exact Or.inl ⟨_, hy⟩
   · cases up_successor_skip.mp h
-    apply FlatMap.lex_of_right
+    apply Flatten.lex_of_right
     exact Or.inr hs
-  · apply FlatMap.lex_of_left
-    exact descending_flatMapStepNone h
+  · apply Flatten.lex_of_left
+    exact descending_flattenStepNone h
 
 theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
   refine ⟨?_⟩
@@ -248,53 +242,22 @@ theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded r
 instance [Monad m] [Iterator α m α'] [Iterator α' m β] [Finite α] [Finite α'] :
     Finite (Flatten α) := by
   refine finite_instIterator (m := m) _ (rel := rel) ?_ ?_
-  · simp only [rel, FlatMap.lex]
+  · simp only [rel, Flatten.lex]
     apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact InvImage.wf _ Finite.wf
     · exact Option.wellFounded_lt <| InvImage.wf _ Finite.wf
   · intro it it' h
     split at h
-    · apply FlatMap.lex_of_left
-      exact descending_flatMapStepNone h
-    · exact descending_flatMapStepSome h
+    · apply Flatten.lex_of_left
+      exact descending_flattenStepNone h
+    · exact descending_flattenStepSome h
 
-end UniverseMonomorphic
-
-/-
-
-Plan:
-
-1. α ~> β, f : β -dependent-> α', α' ~> β', all polymorphic with heterogeneous monads and potentially dependent
-2. convert f into a non-dependent function using some internal helper
-2. use `mapH` ("heterogeneous"):
-  1. apply the non-dependent function to the inner iterator, again using `mapH`
-  1. lift the inner iterator so that it uses the right monad and the right universes (this might not be necessary)
-3. ulift `α`
-4. use the monomorphic `flatten`
-
--/
+end Finite
 
 section General
 
-section Helper
-set_option pp.universes true
-structure SigmaIterator (β : Type u) (α : β → Type max u v) where
-  b : β
-  inner : α b
-
-instance {β : Type u} {α : β → Type max u v} {γ : Type w}
-    {m : Type max u v w → Type max u v w} [Monad m]
-    [i : ∀ b, Iterator (α b) m γ] : Iterator (SigmaIterator β α) m γ :=
-  Iteration.instIterator fun it => do
-    matchStep it.inner
-      (fun it' c => pure <| .yield ⟨it.b, it'⟩ c ⟨⟩)
-      (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
-
-end Helper
-
-section Const
+section FlatMapH
 
 variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m]
   {α' : Type u'} {β' : Type v'} {n : Type max u' v' → Type max u' v'} [Monad n]
@@ -307,9 +270,58 @@ def Iter.flatMapH (f : β → α') [Iterator α m β] (it : Iter (α := α) m β
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
   it.mapH (fun b => IterULiftState.up.{max u v u' v'} (f b) fn) fm |>.flatten
 
-end Const
+end FlatMapH
 
 section Dependent
+
+universe v u
+
+structure SigmaIterator (β : Type u) (α : β → Type max u v) where
+  b : β
+  inner : α b
+
+def SigmaIterator.lex {β : Type u} {α : β → Type max u v} (r : (b : β) → α b → α b → Prop) : SigmaIterator β α → SigmaIterator β α → Prop :=
+  InvImage (PSigma.Lex emptyRelation r) (fun it => ⟨it.b, it.inner⟩)
+
+theorem SigmaIterator.lex_of_right {β : Type u} {α : β → Type max u v} (r : (b : β) → α b → α b → Prop) {b it it'}
+    (h : r b it it') : SigmaIterator.lex r ⟨b, it⟩ ⟨b, it'⟩ :=
+  PSigma.Lex.right _ h
+
+def SigmaIterator.rel {β : Type u} {α : β → Type max u v} [∀ b, Iterator (α b) m β'] :
+    SigmaIterator β α → SigmaIterator β α → Prop :=
+  SigmaIterator.lex (fun _ => InvImage FiniteIteratorWF.lt finiteIteratorWF)
+
+instance {β : Type u} {α : β → Type max u v} {γ : Type w}
+    {m : Type max u v w → Type max u v w} [Monad m]
+    [i : ∀ b, Iterator (α b) m γ] : Iterator (SigmaIterator β α) m γ :=
+  Iteration.instIterator fun it => do
+    matchStep it.inner
+      (fun it' c => pure <| .yield ⟨it.b, it'⟩ c ⟨⟩)
+      (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
+      (pure <| .done ⟨⟩)
+
+instance {β : Type u} {α : β → Type max u v} {γ : Type w}
+    {m : Type max u v w → Type max u v w} [Monad m]
+    [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b)] : Finite (SigmaIterator β α) := by
+  refine finite_instIterator _ (rel := ?_) ?_ ?_
+  · exact SigmaIterator.rel
+  · rw [SigmaIterator.rel]
+    apply InvImage.wf
+    refine ⟨fun ⟨b, it⟩ => ?_⟩
+    apply PSigma.lexAccessible
+    · exact emptyWf.wf.apply b
+    · intro a
+      apply InvImage.wf
+      exact Finite.wf
+  · intro it it' h
+    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep h
+    · cases up_successor_yield.mp h
+      apply SigmaIterator.lex_of_right
+      exact Or.inl ⟨_, hy⟩
+    · cases up_successor_skip.mp h
+      apply SigmaIterator.lex_of_right
+      exact Or.inr hs
+    · cases up_successor_done.mp h
 
 variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m]
   {α' : β → Type u'} {β' : Type v'} {n : Type max u' v' → Type max u' v'} [Monad n]
@@ -322,7 +334,10 @@ def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α :=
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :
     Iter (α := Flatten.{max (max u v u' v') v'}
         (FilterMapH.{max u v u' v'} α (fun b => some (SigmaIterator.mk b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn))) fm)) p β' :=
-  it.mapH (fun b => SigmaIterator.mk.{v, max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm |>.flatten
+  it.mapH (fun b => SigmaIterator.mk.{max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm |>.flatten
+
+variable (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n] [Monad p]
+    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') [Finite α] [∀ b, Finite (α' b)]
 
 end Dependent
 
