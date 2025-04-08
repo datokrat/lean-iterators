@@ -49,6 +49,9 @@ instance (m) [Monad m] : Monad (Iteration m) where
   pure := Iteration.pure
   bind := Iteration.bind
 
+instance (m) [Monad m] : MonadLift m (Iteration m) where
+  monadLift t := { prop := fun _ => True, elem := (⟨·, True.intro⟩) <$> t }
+
 @[inline]
 def Iteration.step {α : Type u} {β : Type v} [Iterator α m β] [Functor m] (it : α) : Iteration m (IterStep.for it) :=
   { prop

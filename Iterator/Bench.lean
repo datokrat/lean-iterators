@@ -97,6 +97,8 @@ where
       return
   termination_by finiteIteratorWF it
 
+#eval testIO [1, 2, 3]
+
 def testIOList : List Nat → IO Unit
   | [] => pure ()
   | x :: xs => do
