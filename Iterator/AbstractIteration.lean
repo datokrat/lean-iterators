@@ -95,7 +95,7 @@ def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Itera
   -- | .skip it' _ => skip it'
   -- | .done _ => done
 
-theorem finite_instIterator {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)} [Functor m]
+theorem finite_instIterator {α : Type u} {β : Type v} {m : Type (max u v) → Type w} [Functor m]
     (stepFn : α → Iteration m (RawStep α β)) {rel : α → α → Prop} (hwf : WellFounded rel) :
     letI : Iterator α m β := Iteration.instIterator stepFn
     (h : ∀ it it', ((ULift.up ∘ IterStep.successor) <$> stepFn it).prop (ULift.up <| some <| it') → rel it' it) → Finite α := by
