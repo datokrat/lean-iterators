@@ -111,6 +111,7 @@ end FilterMap
 
 section FilterMapM
 
+-- TODO: → Type v
 variable {m : Type u → Type u} {α β γ : Type u} {f : β → Option γ}
 
 @[inline]

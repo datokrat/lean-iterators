@@ -145,6 +145,7 @@ theorem descending_flattenStepSome
   · apply Flatten.lex_of_left
     exact descending_flattenStepNone h
 
+-- TODO: put this into core
 theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
   refine ⟨?_⟩
   intro x

@@ -34,7 +34,7 @@ def Iteration.map {γ δ m} [Functor m] (f : γ → δ) (t : Iteration m γ) : I
 @[inline]
 def Iteration.mapH {γ : Type u} {m : Type u → Type v}
     {δ : Type u'} {n : Type u' → Type v'}
-    (f : γ → δ) (mf : ∀ {γ' : Type u} {δ' : Type u'}, (γ' → δ') → m γ' → n δ')
+    (f : γ → δ) (mf : ∀ ⦃γ' : Type u⦄ ⦃δ' : Type u'⦄, (γ' → δ') → m γ' → n δ')
     (t : Iteration m γ) : Iteration n δ :=
   { prop d := ∃ c, d = f c ∧ t.prop c,
     elem := mf (fun c => ⟨f c.1, ⟨c.1, rfl, c.2⟩⟩) t.elem }
@@ -76,7 +76,7 @@ def Iteration.instIterator [Functor m] (stepFn : α → Iteration m (RawStep α 
 
 @[inline]
 def matchStepH.{w} {α : Type u} {β : Type v} [Iterator α m β] {γ : Type (max u v w)} [Functor m]
-    (mf : ∀ {γ' : Type max u v} {δ' : Type max u v w}, (γ' → δ') → m γ' → n δ') [Monad n]
+    (mf : ∀ ⦃γ' : Type max u v⦄ ⦃δ' : Type max u v w⦄, (γ' → δ') → m γ' → n δ') [Monad n]
     (it : α)
     (yield : α → β → Iteration n γ) (skip : α → Iteration n γ) (done : Iteration n γ) := do
   match ← Iteration.mapH ULift.up mf (Iteration.step it) with
@@ -87,7 +87,7 @@ def matchStepH.{w} {α : Type u} {β : Type v} [Iterator α m β] {γ : Type (ma
 @[inline]
 def matchStep {α : Type u} {β : Type v} {γ : Type (max u v)} [Monad m] [Iterator α m β] (it : α)
     (yield : α → β → Iteration m γ) (skip : α → Iteration m γ) (done : Iteration m γ) :=
-  matchStepH.{u} (n := m) Functor.map it yield skip done
+  matchStepH.{u} (n := m) (fun ⦃_ _⦄ => Functor.map) it yield skip done
 
   --   do
   -- match ← Iteration.step it with
@@ -134,7 +134,7 @@ theorem Iteration.prop_map {α β m} [Functor m] (f : α → β) (t : Iteration 
   Iff.rfl
 
 theorem prop_successor_matchStepH.{w} {α : Type u} {β : Type v} {γ : Type (max u v w)} {m} [Monad m] [Iterator α m β]
-    {mf : ∀ {γ' : Type max u v} {δ' : Type max u v w}, (γ' → δ') → m γ' → n δ'} [Monad n] {it : α} {yield skip done}
+    {mf : ∀ ⦃γ' : Type max u v⦄ ⦃δ' : Type max u v w⦄, (γ' → δ') → m γ' → n δ'} [Monad n] {it : α} {yield skip done}
     {f : γ → δ} {x : δ}
     (h : (f <$> matchStepH (γ := γ) mf it yield skip done).prop x) :
     (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' b).prop x) ∨
