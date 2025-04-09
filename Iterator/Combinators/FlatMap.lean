@@ -259,9 +259,6 @@ def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α :=
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
   it.mapH (fun b => SigmaIterator.mk.{max u v u' v'} b (IterULiftState.up.{max u v u' v', v', u'} (f b) fn)) fm |>.flatten
 
-variable (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n] [Monad p]
-    (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') [Finite α] [∀ b, Finite (α' b)]
-
 end Dependent
 
 section Simple
@@ -270,6 +267,12 @@ section Simple
 def Iter.flatMap {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
     {α' : Type u} {β' : Type v} [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :=
   Iter.flatMapH.{u, v, u, v} f it (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map)
+
+@[inline]
+def Iter.flatMapD {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
+    {α' : β → Type u} {β' : Type v} [∀ b, Iterator (α' b) m β'] (f : (b : β) → α' b) (it : Iter (α := α) m β) :=
+  -- TODO: get universes into the right order
+  Iter.flatMapHD.{v, u, u, v} (β := β) f it (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map) (n := m) (p := m)
 
 end Simple
 

@@ -19,6 +19,9 @@ instance [Iterator α m β] [Monad m] : Iterator (Take α) m β :=
         (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩ ⟨⟩)
         (pure <| .done ⟨⟩)
 
+def Iter.take [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
+  toIter <| Take.mk n it.inner
+
 def Take.rel [Iterator α m β] : Take α → Take α → Prop :=
   InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt) (fun it => (it.remaining, productiveIteratorWF it.inner))
 

@@ -8,9 +8,11 @@ import Iterator.Basic
 import Iterator.Combinators
 import Init.Data.Nat.Lemmas
 
-variable {m : Type u → Type u}
+section ListIterator
 
-structure ListIterator (α : Type u) (m : Type u → Type u) where
+variable {m : Type u → Type v}
+
+structure ListIterator (α : Type u) (m : Type u → Type v) where
   list : List α
 
 instance [Pure m] : Iterator (ListIterator α m) m α where
@@ -35,3 +37,32 @@ theorem test [Pure m] :
 
 instance [Pure m] : Finite (ListIterator α m) where
   wf := test.wf (InvImage.wf _ WellFoundedRelation.wf)
+
+end ListIterator
+
+section Unfold
+
+universe u v
+
+variable {m : Type u → Type v}
+
+structure UnfoldIterator (α : Type u) (f : α → α) (m : Type u → Type v) where
+  next : α
+
+instance [Pure m] : Iterator (UnfoldIterator α f m) m α where
+  yielded it it' a := it.next = a ∧ it'.next = f a
+  skipped _ _ := False
+  finished _ := False
+  step | ⟨a⟩ => pure <| .yield ⟨f a⟩ a ⟨rfl, rfl⟩
+
+def Iter.unfold {α : Type u} (init : α) (f : α → α) (m : Type u → Type v := by exact Id) [Pure m] :=
+  toIter <| UnfoldIterator.mk (f := f) (m := m) init
+
+instance [Pure m] : Productive (UnfoldIterator α f m) where
+  wf := by
+    refine ⟨?_⟩
+    intro x
+    constructor
+    rintro _ ⟨⟩
+
+end Unfold

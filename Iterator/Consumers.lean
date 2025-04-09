@@ -36,6 +36,7 @@ def Iter.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α
     (f : γ → β → n γ) (init : γ) (it : Iter (α := α) m β) : n γ :=
   Iterator.fold f init it.inner
 
+-- TODO: more universe polymorphism without making this too inconvenient
 @[inline]
 def Iterator.toArray [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (Array β) :=
   go it #[]
@@ -75,3 +76,15 @@ def Iterator.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (i
 @[inline]
 def Iter.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (List β) :=
   Iterator.toList it
+
+@[inline]
+def Iterator.drain [Monad m] [Iterator α m β] [Finite α] (it : α) : m PUnit := do
+  match ← Iterator.step it with
+  | .yield it' _ _ => Iterator.drain it'
+  | .skip it' _ => Iterator.drain it'
+  | .done _ => return ⟨⟩
+  termination_by finiteIteratorWF it
+
+@[inline]
+def Iter.drain [Monad m] [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m PUnit :=
+  Iterator.drain it.inner

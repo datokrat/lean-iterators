@@ -60,14 +60,16 @@ works because the iterator type at hand has an instance of the `Finite` typeclas
 Iterators that may not terminate but will not end up in an infinite sequence of `.skip`
 steps are called productive. This behavior is encoded in the `Productive` typeclass.
 
+The framework is heavily inspired by Rust's iterator library and Haskell's streamly.
+In particular, it is designed so that even complex iterators are compiled into efficient
+loops (stream fusion).
+
 ## Module structure
 
 ### Basic iterator API
 
-* This file, `Iterator.Basic`, contains the definition of central types. See below.
-* `Iterator.Wrapper` defines the structure `Iter {α} m β` that wraps an iterator type `α` (that has an
-  `Iterator α m β` instance) in order to provide convenience methods with field notation. Most API methods
-  will return `Iter` instead of the plain underlying iterator type.
+* This file, `Iterator.Basic`, contains the definition of `Iterator`, `Finite` and `Productive`.
+* `Iterator.Wrapper` defines the convenience wrapper structure `Iter {α} m β`.
 * Generators (i.e., `.iter` methods for various data types) are provided in `Iterator.Generators`.
 * Combinators (i.e., ways to build new iterators out of existing ones) are provided in
   `Iterator.Combinators`.
