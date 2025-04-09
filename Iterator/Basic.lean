@@ -9,7 +9,90 @@ import Init.Classical
 import Init.Ext
 import Init.NotationExtra
 import Init.TacticsExtra
-import Iterator.MonadSatisfying
+
+/-!
+# Iterators
+
+This module provides an iterator framework.
+An iterator is an abstraction of a sequence of values that may or may not terminate.
+Collection types such as `List`, `Array` or `TreeMap` are supposed to provide iterators via
+an `.iter` method.
+
+Most users of the iterator API will just put together existing library functions that
+create, combine and consumer iterators. Consider a simple example:
+
+```lean
+-- [1, 2, 3].iter : Iter Id Nat (with implicit argument α := ListIterator α)
+#check [1, 2, 3].iter
+
+#eval [1, 2, 3].iter.step
+
+-- 12
+#eval [1, 2, 3].iter.map (· * 2) |>.fold (init := 0) (· + ·)
+```
+
+Generally, an iterator is an element of an arbitrary type `α` that has an
+`Iterator α m β` instance. Here, `m` is a monad and `β` is the type of out put values that
+the iterator spits out. `Iter {α} m β` is just a wrapper around such `α` and it provides
+many convenience functions that are available in field notation.
+
+The heart of every iterator is its `step` function, which returns `m (IterStep α β ..)`.
+Here, `IterStep` is an inductive type that either (1) provides an output value in `β` and a
+successor iterator, (2) provides only a successor iterator with no output, or
+(3) signals that the iterator has finished and will provide no more outputs.
+
+The `step` function can also be used by hand:
+
+```lean
+def sumrec (l : List Nat) : Nat :=
+  go (l.iter.map (2 * ·)) 0
+where
+  go it acc :=
+    match it.step with
+    | .yield it' n _ => go it' (acc + n)
+    | .skip it' _ => go it' acc
+    | .done _ => acc
+  termination_by finiteIteratorWF it
+```
+
+In general, iterators do not need to terminate after finitely many steps. This example
+works because the iterator type at hand has an instance of the `Finite` typeclass.
+Iterators that may not terminate but will not end up in an infinite sequence of `.skip`
+steps are called productive. This behavior is encoded in the `Productive` typeclass.
+
+## Module structure
+
+### Basic iterator API
+
+* This file, `Iterator.Basic`, contains the definition of central types. See below.
+* `Iterator.Wrapper` defines the structure `Iter {α} m β` that wraps an iterator type `α` (that has an
+  `Iterator α m β` instance) in order to provide convenience methods with field notation. Most API methods
+  will return `Iter` instead of the plain underlying iterator type.
+* Generators (i.e., `.iter` methods for various data types) are provided in `Iterator.Generators`.
+* Combinators (i.e., ways to build new iterators out of existing ones) are provided in
+  `Iterator.Combinators`.
+* Consumers (i.e., ways to actually iterate over an iterator) are provided in `Iterator.Consumers`.
+
+### Iterator implementation and verification API
+
+This API is still experimental and should not be relied on. As soon as it is clear that no fundamental
+changes are necessary, this disclaimer will be removed.
+
+* `Iterator.AbstractIteration` provides a monad that simplifies the construction and verification
+  (especially, verification of finiteness or productiveness) of iterators.
+* `Iterator.IteratorMorphism` provides another means to prove an iterator to be finite or productive
+  by means of defining a structure-preserving map into another iterator type that is known to be
+  finite or productive.
+
+### Examples and benchmarks
+
+* `Iterator.Bench` contains a few simple use cases for the iterator library.
+  It is used for performance measurements and the analysis of the generated IR.
+* `Iterator.ProjectBatomorph` exemplifies a potential performance improvement by generating
+  multiple loops instead of only one. This heavily relies on type-level programming and is thought
+  to improve the performance of `Drop` and `Concat` (the latter of which we don't have yet).
+
+-/
 
 variable {α : Type u} {β : Type v}
 

@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Combinators
+import Init.Data.Nat.Lemmas
 
 variable {m : Type u → Type u}
 
