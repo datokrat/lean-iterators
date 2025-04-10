@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
+
 -- Project Batomorph: super flat iterators, fast as rays
 
 class Iterator (α : Type) (β : outParam Type) where
