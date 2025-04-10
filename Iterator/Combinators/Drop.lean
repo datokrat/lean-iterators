@@ -6,6 +6,10 @@ Authors: Paul Reichert
 prelude
 import Iterator.AbstractIteration
 
+/-!
+This file provides the iterator combinator `Iter.drop`.
+-/
+
 structure Drop (α : Type u) where
   remaining : Nat
   inner : α
@@ -18,6 +22,35 @@ instance [Iterator α m β] [Monad m] : Iterator (Drop α) m β :=
         | remaining' + 1 => pure <| .skip ⟨remaining', it'⟩ ⟨⟩)
       (fun it' => pure <| .skip ⟨it.remaining, it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
+
+/--
+Given an iterator `it` and a natural number `n`, `it.drop n` is an iterator that forwards all of
+`it`'s output values except for the first `n`.
+
+**Marble diagram:**
+
+```text
+it          ---a----b---c--d-e--⊥
+it.drop 3   ---------------d-e--⊥
+
+it          ---a--⊥
+it.drop 3   ------⊥
+```
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` is finite
+* `Productive` instance: only if `it` is productive
+
+_TODO_: prove `Productive`
+
+**Performance:**
+
+Currently, this combinator incurs an additional O(1) cost with each output of `it`, even when the iterator
+does not drop any elements anymore.
+-/
+def Iter.drop [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
+  toIter <| Drop.mk n it.inner
 
 def Drop.rel [Iterator α m β] : Drop α → Drop α → Prop :=
   InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ Drop.inner)

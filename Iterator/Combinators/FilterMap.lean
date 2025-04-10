@@ -8,6 +8,19 @@ import Iterator.Wrapper
 import Iterator.AbstractIteration
 import Iterator.IteratorMorphism
 
+/-!
+This file provides iterator combinators for filtering and mapping.
+
+* `Iter.filterMap` either modifies or drops each value based on an option-valued mapping function.
+* `Iter.filter` drops some elements based on a predicate.
+* `Iter.map` modifies each value based on a mapping function
+
+Several variants of these combinators are provided:
+
+* `M` suffix: monadic mapping function
+* `H` suffix: heterogeneous variant that allows switching the monad and the universes.
+-/
+
 section FilterMapMH
 
 universe u' v' u v
@@ -49,22 +62,93 @@ instance [Finite α] : Finite (FilterMapMH.{u'} α f mf) := by
     · cases up_successor_skip.mp h'
       exact Or.inr h
     · cases up_successor_done.mp h'
-
 @[inline]
 def Iterator.filterMapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift (Option β'))) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : α) :
     FilterMapMH.{u'} α f mf :=
   ⟨it⟩
 
+/--
+Given an iterator `it`, a monadic `Option`-valued mapping function `f` and a monad transformation `mf`,
+`it.filterMapMH f mf` is an iterator that applies `f` to each output of `it`. If `f` returns `none`,
+the output is dropped. If it returns `some x`, then the iterator yields `x`.
+
+**Marble diagram (without monadic effects):**
+
+```text
+it                 ---a --b--c --d-e--⊥
+it.filterMapMH     ---a'-----c'-------⊥
+```
+
+(given that `f a = some a'`, `f c = some c'` and `f b = f d = d e = none`)
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` is finite
+* `Productive` instance: not available
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
+-/
 @[inline]
 def Iter.filterMapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift (Option β'))) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
     Iter (α := FilterMapMH.{u'} α f mf) n β' :=
   toIter <| Iterator.filterMapMH f mf it.inner
 
+/--
+Given an iterator `it`, a monadic mapping function `f` and a monad transformation `mf`,
+`it.mapMH f mf` is an iterator that applies `f` to each output of `it`. If `f` returns `none`,
+the output is dropped. If it returns `some x`, then the iterator yields `x`.
+
+**Marble diagram (without monadic effects):**
+
+```text
+it                 ---a --b --c --d -e --⊥
+it.mapMH           ---a'--b'--c'--d'-e'--⊥
+```
+
+(given that `f a = a'` and so on)
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` is finite
+* `Productive` instance: only if `it` is productive
+
+_TODO_: prove `Productive`. This requires us to wrap the FilterMapMH into a new type.
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
+-/
 @[inline]
 def Iter.mapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift β')) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
     Iter (α := FilterMapMH.{u'} α (fun b => (ULift.up ∘ some ∘ ULift.down) <$> f b) mf) n β' :=
   it.filterMapMH _ mf
 
+
+/--
+Given an iterator `it`, a monadic predicate `p` and a monad transformation `mf`,
+`it.filterMH p mf` is an iterator that applies `p` to each output of `it`. If `p` returns `false`,
+the output is dropped. Otherwise, the iterator forwards the output of `it`.
+
+**Marble diagram (without monadic effects):**
+
+```text
+it                 ---a--b--c--d-e--⊥
+it.filterMH        ---a-----c-------⊥
+```
+
+(given that `f a = f c = true'` and `f b = f d = d e = false`)
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` is finite
+* `Productive` instance: not available
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
+-/
 @[inline]
 def Iter.filterMH {n : Type max u v u' → Type max u v u'} [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift Bool))
     (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :

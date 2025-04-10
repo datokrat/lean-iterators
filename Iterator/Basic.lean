@@ -93,7 +93,13 @@ changes are necessary, this disclaimer will be removed.
 * `Iterator.ProjectBatomorph` exemplifies a potential performance improvement by generating
   multiple loops instead of only one. This heavily relies on type-level programming and is thought
   to improve the performance of `Drop` and `Concat` (the latter of which we don't have yet).
-
+* `Iterator.ProjectBigCrunch` is a proof of concept for an alternative iterator definitiion that has
+  the advantage that the internal state of the iterator does not affect the universe level of the iterator
+  itself. Instead, the iterator lives in the same universe as its outputs. The disadvantages: it requires some
+  not totally obvious optimizations (such as erasing fuel variables and more) in order to achieve more
+  than just asymptotically good performance, and it's quite difficult to iterate even a few steps over an
+  iterator that has not been proven to be finite. It's also unclear how this can be generalized to the
+  monadic setting.
 -/
 
 variable {α : Type u} {β : Type v}

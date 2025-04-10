@@ -6,6 +6,19 @@ Authors: Paul Reichert
 prelude
 import Iterator.Combinators.FilterMap
 
+/-!
+This file provides the `flatMap` iterator and variants of it.
+
+To each output of some base iterator `it`, `it.flatMap f`, applies `f` to obtain an inner iterator.
+The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
+next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
+
+Several variants of `flatMap` are provided:
+
+* `H` suffix: heterogeneous variant that allows switching the monad and the universes.
+* `D` suffix: dependently typed mapping function
+-/
+
 section ULiftState
 
 universe u' v u
@@ -190,6 +203,42 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ'} {fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ'}
   {f : (b : β) → α'}
 
+/--
+Given an iterator `it`, a heterogeneous iterator-valued mapping function `f`
+and monad transformations `fm` and `fn`, `it.flatMapH f mf` is an iterator that applies
+`f` to each output of `it` to obtain an inner iterator.
+The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
+next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
+
+**Marble diagram:**
+
+```text
+it                 ---a    ---b     c    --d--⊥
+f a                   a1-a2⊥
+f b                           b1-b2 ⊥
+f c                                 c1-c2⊥
+f d                                        ⊥
+it.flatMapH        ---a1-a2---b1-b2 c1-c2  ---⊥
+```
+
+Note that it is always possible for the implementation to insert some skip steps in between.
+The insertion of additional skip steps is an implementation detail and should not be relevant
+for any consumer.
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` and all of the iternal iterators are finite
+* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
+
+_TODO:_ implement the `Productive` instance
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
+
+_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
+least work for internal iterator types that contain a computationally cheap empty iterator.
+-/
 @[inline]
 def Iter.flatMapH (f : β → α') [Iterator α m β] (it : Iter (α := α) m β) [Iterator α' n β'] [Monad m] [Monad n] [Monad p]
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
@@ -254,6 +303,42 @@ variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad 
   {fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ'} {fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ'}
   {f : (b : β) → α' b}
 
+/--
+Given an iterator `it`, a dependently typed, heterogeneous iterator-valued mapping function `f`
+and monad transformations `fm` and `fn`, `it.flatMapHD f mf` is an iterator that applies
+`f` to each output of `it` to obtain an inner iterator.
+The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
+next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
+
+**Marble diagram:**
+
+```text
+it                 ---a    ---b     c    --d--⊥
+f a                   a1-a2⊥
+f b                           b1-b2 ⊥
+f c                                 c1-c2⊥
+f d                                        ⊥
+it.flatMapHD       ---a1-a2---b1-b2 c1-c2  ---⊥
+```
+
+Note that it is always possible for the implementation to insert some skip steps in between.
+The insertion of additional skip steps is an implementation detail and should not be relevant
+for any consumer.
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` and all of the iternal iterators are finite
+* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
+
+_TODO:_ implement the `Productive` instance
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
+
+_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
+least work for internal iterator types that contain a computationally cheap empty iterator.
+-/
 @[inline]
 def Iter.flatMapHD (f : (b : β) → α' b) [Iterator α m β] (it : Iter (α := α) m β) [∀ b, Iterator (α' b) n β'] [Monad m] [Monad n] [Monad p]
     (fm : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → p δ') (fn : ∀ ⦃δ δ'⦄, (δ → δ') → n δ → p δ') :=
@@ -263,11 +348,81 @@ end Dependent
 
 section Simple
 
+/--
+Given an iterator `it`, an iterator-valued mapping function `f`,
+`it.flatMap f` is an iterator that applies `f` to each output of `it` to obtain an inner iterator.
+The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
+next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
+
+**Marble diagram:**
+
+```text
+it                 ---a    ---b     c    --d--⊥
+f a                   a1-a2⊥
+f b                           b1-b2 ⊥
+f c                                 c1-c2⊥
+f d                                        ⊥
+it.flatMap         ---a1-a2---b1-b2 c1-c2  ---⊥
+```
+
+Note that it is always possible for the implementation to insert some skip steps in between.
+The insertion of additional skip steps is an implementation detail and should not be relevant
+for any consumer.
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` and all of the iternal iterators are finite
+* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
+
+_TODO:_ implement the `Productive` instance
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
+
+_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
+least work for internal iterator types that contain a computationally cheap empty iterator.
+-/
 @[inline]
 def Iter.flatMap {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
     {α' : Type u} {β' : Type v} [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :=
   Iter.flatMapH.{u, v, u, v} f it (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map)
 
+/--
+Given an iterator `it`, an iterator-valued mapping function `f`,
+`it.flatMapD f` is an iterator that applies `f` to each output of `it` to obtain an inner iterator.
+The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
+next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
+
+**Marble diagram:**
+
+```text
+it                 ---a    ---b     c    --d--⊥
+f a                   a1-a2⊥
+f b                           b1-b2 ⊥
+f c                                 c1-c2⊥
+f d                                        ⊥
+it.flatMapD        ---a1-a2---b1-b2 c1-c2  ---⊥
+```
+
+Note that it is always possible for the implementation to insert some skip steps in between.
+The insertion of additional skip steps is an implementation detail and should not be relevant
+for any consumer.
+
+**Termination properties:**
+
+* `Finite` instance: only if `it` and all of the iternal iterators are finite
+* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
+
+_TODO:_ implement the `Productive` instance
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
+
+_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
+least work for internal iterator types that contain a computationally cheap empty iterator.
+-/
 @[inline]
 def Iter.flatMapD {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
     {α' : β → Type u} {β' : Type v} [∀ b, Iterator (α' b) m β'] (f : (b : β) → α' b) (it : Iter (α := α) m β) :=

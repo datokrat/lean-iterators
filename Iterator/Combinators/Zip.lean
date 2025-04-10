@@ -196,6 +196,34 @@ universe u v
 variable {α₁ α₂ : Type u} {β₁ β₂ : Type v} {m : Type max u v → Type max u v}
   [Monad m] [Iterator α₁ m β₁] [Iterator α₂ m β₂]
 
+/--
+Given two iterators `left` and `right`,
+`left.zip right` is an iterator that yields pairs of outputs of `left` and `right` as long as
+both produce outputs. When one of them terminates, the `zip` iterator will also terminate.
+
+**Marble diagram:**
+
+```text
+left               --a        ---b        --c
+right                 --x         --y        --⊥
+left.zip right     -----(a, x)------(b, y)-----⊥
+```
+
+Note that it is always possible for the implementation to insert some skip steps in between.
+The insertion of additional skip steps is an implementation detail and should not be relevant
+for any consumer.
+
+**Termination properties:**
+
+* `Finite` instance: only if either `left` or `right` is finite and the other is productive
+* `Productive` instance: only if `left` and `right` are productive
+
+_TODO:_ implement the `Productive` instance
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `left` or `right`.
+-/
 def Iter.zip (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :=
   Iter.zipH left right (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map)
 

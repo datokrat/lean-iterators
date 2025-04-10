@@ -6,6 +6,10 @@ Authors: Paul Reichert
 prelude
 import Iterator.AbstractIteration
 
+/-!
+This file provides the iterator combinator `Iter.take`.
+-/
+
 structure Take (α : Type u) where
   remaining : Nat
   inner : α
@@ -19,6 +23,31 @@ instance [Iterator α m β] [Monad m] : Iterator (Take α) m β :=
         (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩ ⟨⟩)
         (pure <| .done ⟨⟩)
 
+/--
+Given an iterator `it` and a natural number `n`, `it.take n` is an iterator that outputs
+up to the first `n` of `it`'s values in order and then terminates.
+
+**Marble diagram:**
+
+```text
+it          ---a----b---c--d-e--⊥
+it.take 3   ---a----b---c⊥
+
+it          ---a--⊥
+it.take 3   ---a--⊥
+```
+
+**Termination properties:**
+
+* `Finite` instance: always ✓
+* `Productive` instance: only if `it` is productive
+
+_TODO_: prove `Productive`
+
+**Performance:**
+
+This combinator incurs an additional O(1) cost with each output of `it`.
+-/
 def Iter.take [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
   toIter <| Take.mk n it.inner
 

@@ -23,10 +23,15 @@ instance [Pure m] : Iterator (ListIterator α m) m α where
     | { list := .nil } => pure <| .done rfl
     | { list := x :: xs } => pure <| .yield { list := xs } x (by simp)
 
+/--
+Returns a finite iterator for the given list.
+The iterator yields the elements of the list in order and then terminates.
+-/
+@[inline]
 def List.iter {α} (l : List α) (m := Id) [Pure m] : Iter (α := ListIterator α m) m α :=
   toIter { list := l }
 
-theorem test [Pure m] :
+theorem ListIterator.subrelation [Pure m] :
     Subrelation (FiniteIteratorWF.lt (α := ListIterator α m))
       (InvImage WellFoundedRelation.rel (ListIterator.list ∘ FiniteIteratorWF.inner)) := by
   intro x y hlt
@@ -36,7 +41,7 @@ theorem test [Pure m] :
   simp_all
 
 instance [Pure m] : Finite (ListIterator α m) where
-  wf := test.wf (InvImage.wf _ WellFoundedRelation.wf)
+  wf := ListIterator.subrelation.wf (InvImage.wf _ WellFoundedRelation.wf)
 
 end ListIterator
 
@@ -55,6 +60,11 @@ instance [Pure m] : Iterator (UnfoldIterator α f m) m α where
   finished _ := False
   step | ⟨a⟩ => pure <| .yield ⟨f a⟩ a ⟨rfl, rfl⟩
 
+/--
+Creates an infinite, productive iterator. First it yields `init`.
+If the last step yielded `a`, the next will yield `f a`.
+-/
+@[inline]
 def Iter.unfold {α : Type u} (init : α) (f : α → α) (m : Type u → Type v := by exact Id) [Pure m] :=
   toIter <| UnfoldIterator.mk (f := f) (m := m) init
 
