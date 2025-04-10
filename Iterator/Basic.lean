@@ -88,8 +88,9 @@ changes are necessary, this disclaimer will be removed.
 
 ### Examples and benchmarks
 
-* `Iterator.Bench` contains a few simple use cases for the iterator library.
-  It is used for performance measurements and the analysis of the generated IR.
+* `Iterator.Examples` showcases plausible use cases for the iterator library.
+* `Iterator.Bench` contains some other use cases.
+   They are used for performance measurements and the analysis of the generated IR.
 * `Iterator.ProjectBatomorph` exemplifies a potential performance improvement by generating
   multiple loops instead of only one. This heavily relies on type-level programming and is thought
   to improve the performance of `Drop` and `Concat` (the latter of which we don't have yet).
