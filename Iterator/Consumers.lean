@@ -5,86 +5,89 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Wrapper
+import Iterator.Combinators.MonadEval
 
-@[specialize]
-def Iterator.forIn {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α]
-    (it : α) (init : γ) (f : β → γ → n (ForInStep γ)) : n γ := do
-  match ← MonadEvalT.monadEval <| Iterator.step it with
+@[inline]
+def Iter.forIn {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α m]
+    (it : Iter (α := α) m β) (init : γ) (f : β → γ → n (ForInStep γ)) : n γ := do
+  let x : OverT n (IterStep.for m it) := MonadEvalT.monadEval <| Iterator.step it
+  match x.f (← x.el) with
   | .yield it' b _ =>
     match ← f b init with
-    | .yield c => Iterator.forIn it' c f
+    | .yield c => it'.forIn c f
     | .done c => return c
-  | .skip it' _ => Iterator.forIn (m := m) it' init f
+  | .skip it' _ => it'.forIn init f
   | .done _ => return init
-termination_by finiteIteratorWF it
+termination_by finiteIteratorWF (m := m) it
 
-instance {m} [Monad m] [Monad n] [MonadEvalT m n] {α β} [Iterator α m β] [Finite α] :
-    ForIn n α β where
-  forIn := Iterator.forIn
+instance {m} [Monad m] [Monad n] [MonadEvalT m n] {α β} [Iterator α m β] [Finite α m] :
+    ForIn n (Iter (α := α) m β) β where
+  forIn := Iter.forIn
 
 @[specialize]
-def Iterator.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α]
-    (f : γ → β → n γ) (init : γ) (it : α) : n γ := do
-  match ← MonadEvalT.monadEval <| Iterator.step it with
-  | .yield it' b _ => Iterator.fold f (← f init b) it'
-  | .skip it' _ => Iterator.fold f init it'
+def Iter.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α m]
+    (f : γ → β → n γ) (init : γ) (it : Iter (α := α) m β) : n γ := do
+  let step : OverT n (IterStep.for m it) := MonadEvalT.monadEval <| Iterator.step it
+  match step.f (← step.el) with
+  | .yield it' b _ => it'.fold f (← f init b)
+  | .skip it' _ => it'.fold f init
   | .done _ => return init
-termination_by finiteIteratorWF it
+termination_by finiteIteratorWF (m := m) it
 
+-- TODO: This may have performance problems because we use bindH and recursion so that
+-- Lean won't be able to inline the `OverT` code.
 @[inline]
-def Iter.fold {m n} [Monad m] [Monad n] [MonadEvalT m n] {α β γ} [Iterator α m β] [Finite α]
-    (f : γ → β → n γ) (init : γ) (it : Iter (α := α) m β) : n γ :=
-  Iterator.fold f init it.inner
-
--- TODO: more universe polymorphism without making this too inconvenient
-@[inline]
-def Iterator.toArray [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (Array β) :=
+def Iter.toArrayH {α : Type u} {m : Type w → Type w'} [Monad m] {β : Type v}
+    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : OverT m (Array β) :=
   go it #[]
 where
   @[specialize]
-  go [Finite α] (it : α) a := do
-    match ← Iterator.step it with
+  go [Monad m] [Finite α m] it a := do
+    let step := Iterator.step (m := m) it
+    step.bindH (match · with
+      | .yield it' b _ => go it' (a.push b)
+      | .skip it' _ => go it' a
+      | .done _ => return a)
+  termination_by finiteIteratorWF (m := m) it
+
+@[inline]
+def Iter.toArray {α : Type u} {m : Type v → Type w} [Monad m] {β : Type v}
+    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m (Array β) :=
+  go it #[]
+where
+  @[specialize]
+  go [Monad m] [Finite α m] it a := do
+    let step := Iterator.step it
+    match step.f (← step.el) with
     | .yield it' b _ => go it' (a.push b)
     | .skip it' _ => go it' a
     | .done _ => return a
-  termination_by finiteIteratorWF it
+  termination_by finiteIteratorWF (m := m) it
 
 @[inline]
-def Iter.toArray [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (Array β) :=
-  Iterator.toArray it
-
-@[inline]
-def Iterator.reverseToList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (List β) :=
+def Iter.reverseToList {α : Type u} {m : Type v → Type w} [Monad m] {β : Type v}
+    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m (List β) :=
   go it []
 where
   @[specialize]
-  go [Finite α] (it : α) bs := do
-    match ← Iterator.step it with
+  go [Finite α m] it bs := do
+    let step := Iterator.step it
+    match step.f (← step.el) with
     | .yield it' b _ => go it' (b :: bs)
     | .skip it' _ => go it' bs
     | .done _ => return bs
-  termination_by finiteIteratorWF it
+  termination_by finiteIteratorWF (m := m) it
 
 @[inline]
-def Iter.reverseToList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (List β) :=
-  Iterator.reverseToList it
+def Iter.toList {α : Type u} {m : Type v → Type w} [Monad m] {β : Type v}
+    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m (List β) :=
+  Array.toList <$> it.toArray
 
-@[inline]
-def Iterator.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : α) : m (List β) :=
-  Array.toList <$> Iterator.toArray it
-
-@[inline]
-def Iter.toList [Monad m] {α β : Type u} [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m (List β) :=
-  Iterator.toList it
-
-@[inline]
-def Iterator.drain [Monad m] [Iterator α m β] [Finite α] (it : α) : m PUnit := do
-  match ← Iterator.step it with
-  | .yield it' _ _ => Iterator.drain it'
-  | .skip it' _ => Iterator.drain it'
+@[specialize]
+def Iter.drain [Monad m] [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m PUnit := do
+  let step := Iterator.step it
+  match step.f (← step.el) with
+  | .yield it' _ _ => it'.drain
+  | .skip it' _ => it'.drain
   | .done _ => return ⟨⟩
-  termination_by finiteIteratorWF it
-
-@[inline]
-def Iter.drain [Monad m] [Iterator α m β] [Finite α] (it : Iter (α := α) m β) : m PUnit :=
-  Iterator.drain it.inner
+  termination_by finiteIteratorWF (m := m) it

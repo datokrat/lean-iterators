@@ -25,46 +25,46 @@ section FilterMapMH
 
 universe u' v' u v
 
-structure FilterMapMH (α : Type u) {β : Type v}
-    {m : Type max u v → Type max u v} [Iterator α m β] {β' : Type v'} {n : Type max u u' v v' → Type max u u' v v'}
-    (f : β → n (ULift (Option β')))
-    (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') : Type max u u' v where
+structure FilterMapMH (α : Type u) {β : Type v} {β' : Type v'}
+    {m : Type w → Type w'} (f : β → OverT m (Option β')) where
   inner : α
 
-variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
-    {β' : Type v'} {n : Type max u u' v v' → Type max u u' v v'} {f : β → n (ULift (Option β'))} [Monad n]
-    {mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ'}
+variable {α : Type u} {β : Type v} {β' : Type v'} {m : Type w → Type w'} [Monad m] [Iterator α m β]
+    {f : β → OverT m (Option β')}
 
-instance : Iterator (FilterMapMH.{u'} α f mf) n β' :=
+instance : Iterator (FilterMapMH α f) m β' :=
   Iteration.instIterator fun it =>
-    matchStepH.{max u' v'} (fun {δ δ'} => mf (δ := δ) (δ' := δ')) it.inner
-      (fun it' b => do match (← monadLift (f b)).down with
-        | none => pure <| .skip ⟨it'⟩ ⟨⟩
-        | some c => pure <| .yield ⟨it'⟩ c ⟨⟩)
+    matchStepH it.inner
+      (fun it' b => Iteration.mapH
+        (match · with
+          | none => .skip ⟨it'⟩ ⟨⟩
+          | some c => .yield ⟨it'⟩ c ⟨⟩)
+        (monadLift (f b)))
       (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
 
-instance [Finite α] : Finite (FilterMapMH.{u'} α f mf) := by
-  refine finite_instIterator (α := FilterMapMH.{u'} α f mf) (β := β') (m := n) (rel := ?_) ?_ ?_ ?_
-  · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ FilterMapMH.inner)
+instance [Finite α m] : Finite (FilterMapMH α f) m := by
+  refine finite_instIterator (α := FilterMapMH α f) (β := β') (m := m) (rel := ?_) ?_ ?_ ?_
+  · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ FilterMapMH.inner)
   · apply InvImage.wf
     exact Finite.wf
   · intro it it' h
     replace h := prop_successor_matchStepH h
     obtain ⟨it'', b, h, h'⟩ | ⟨it'', h, h'⟩ | ⟨h, h'⟩ := h
-    · simp only [Iteration.prop_map, Iteration.prop_bind] at h'
+    · simp only [Iteration.prop_map, Iteration.prop_mapH, Iteration.prop_bindH] at h'
       obtain ⟨a, ha, b, h'⟩ := h'
       split at h'
-      · cases up_successor_skip.mp ⟨a, ha, h'.1⟩
+      · cases up_successor_skip (m := m) |>.mp ⟨a, ha, h'.1⟩
         apply Or.inl ⟨_, h⟩
-      · cases up_successor_yield.mp ⟨a, ha, h'.1⟩
+      · cases up_successor_yield (m := m) |>.mp ⟨a, ha, h'.1⟩
         apply Or.inl ⟨_, h⟩
     · cases up_successor_skip.mp h'
       exact Or.inr h
     · cases up_successor_done.mp h'
+
 @[inline]
-def Iterator.filterMapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift (Option β'))) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : α) :
-    FilterMapMH.{u'} α f mf :=
+def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → OverT m (Option β')) (it : α) :
+    FilterMapMH α f :=
   ⟨it⟩
 
 /--
@@ -91,9 +91,9 @@ it.filterMapMH     ---a'-----c'-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift (Option β'))) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
-    Iter (α := FilterMapMH.{u'} α f mf) n β' :=
-  toIter <| Iterator.filterMapMH f mf it.inner
+def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → OverT m (Option β')) (it : Iter (α := α) m β) :
+    Iter (α := FilterMapMH α f) m β' :=
+  toIter m <| Iterator.filterMapMH f it.inner
 
 /--
 Given an iterator `it`, a monadic mapping function `f` and a monad transformation `mf`,
@@ -121,10 +121,8 @@ _TODO_: prove `Productive`. This requires us to wrap the FilterMapMH into a new 
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.mapMH [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift β')) (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
-    Iter (α := FilterMapMH.{u'} α (fun b => (ULift.up ∘ some ∘ ULift.down) <$> f b) mf) n β' :=
-  it.filterMapMH _ mf
-
+def Iter.mapMH [Monad m] [Iterator α m β] (f : β → OverT m β') (it : Iter (α := α) m β) :=
+  (it.filterMapMH (fun b => some <$> f b) : Iter m β')
 
 /--
 Given an iterator `it`, a monadic predicate `p` and a monad transformation `mf`,
@@ -150,10 +148,9 @@ it.filterMH        ---a-----c-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMH {n : Type max u v u' → Type max u v u'} [Monad n] [Monad m] [Iterator α m β] (f : β → n (ULift Bool))
-    (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :
-    Iter (α := FilterMapMH.{u'} α (fun b => (fun x => if x.down then (.up (some b)) else (.up none)) <$> f b) mf) n β :=
-  it.filterMapMH _ mf
+def Iter.filterMH [Monad m] [Iterator α m β] (f : β → OverT m Bool) (it : Iter (α := α) m β) :
+    Iter (α := FilterMapMH α (fun b => (f b).mapH (fun x => if x then some b else none))) m β :=
+  (it.filterMapMH _ : Iter m β)
 
 end FilterMapMH
 
@@ -161,17 +158,16 @@ section FilterMapH
 
 universe u' v' u v
 
-variable {α : Type u} {β : Type v} {m : Type max u v → Type max u v} [Monad m] [Iterator α m β]
-    {β' : Type v'} {f : β → Option β'} {n : Type max u u' v v' → Type max u u' v v'} [Monad n]
-    {mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ'}
+variable {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m] [Iterator α m β]
+    {β' : Type v'} {f : β → Option β'}
 
 @[inline]
-def Iter.filterMapH [Monad n] [Monad m] [Iterator α m β] (f : β → Option β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :=
-  Iter.filterMapMH.{u', v'} (α := α) (m := m) (n := n) (fun b => pure <| .up <| f b) mf it
+def Iter.filterMapH [Monad m] [Iterator α m β] (f : β → Option β') (it : Iter (α := α) m β) :=
+  (it.filterMapMH (pure ∘ f) : Iter m β')
 
 @[inline]
-def Iter.mapH [Monad n] [Monad m] [Iterator α m β] (f : β → β') (mf : ∀ ⦃δ : Type max u v⦄ ⦃δ' : Type max u v u' v'⦄, (δ → δ') → m δ → n δ') (it : Iter (α := α) m β) :=
-  Iter.filterMapH.{u', v'} (α := α) (fun b => some <| f b) mf it
+def Iter.mapH [Monad m] [Iterator α m β] (f : β → β') (it : Iter (α := α) m β) :=
+  (it.filterMapH (some ∘ f) : Iter m β')
 
 end FilterMapH
 
@@ -181,33 +177,32 @@ variable {m : Type max u v → Type max u v} {α : Type u} {β γ : Type v} {f :
 
 @[inline]
 def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :=
-  it.filterMapH f (m := m) (fun ⦃_ _⦄ => Functor.map)
+  (it.filterMapH f : Iter m γ)
 
 @[inline]
 def Iter.map [Iterator α m β] [Monad m] (f : β → γ) (it : Iter (α := α) m β) :=
-  it.filterMap (some ∘ f)
+  (it.filterMap (some ∘ f) : Iter m γ)
 
 @[inline]
 def Iter.filter [Iterator α m β] [Monad m] (f : β → Bool) (it : Iter (α := α) m β) :=
-  it.filterMap (fun b => if f b then some b else none)
+  (it.filterMap (fun b => if f b then some b else none) : Iter m β)
 
 end FilterMap
 
 section FilterMapM
 
--- TODO: → Type v
-variable {m : Type u → Type u} {α β γ : Type u} {f : β → Option γ}
+variable {m : Type u → Type v} {α β γ : Type u} {f : β → Option γ}
 
 @[inline]
 def Iter.filterMapM [Iterator α m β] [Monad m] (f : β → m (Option γ)) (it : Iter (α := α) m β) :=
-  Iter.filterMapMH.{u, u, u, u} (α := α) (fun b => ULift.up <$> f b) (m := m) (fun ⦃_ _⦄ => Functor.map) it
+  (it.filterMapMH (OverT.eval ∘ f) : Iter m γ)
 
 @[inline]
 def Iter.mapM [Iterator α m β] [Monad m] (f : β → m γ) (it : Iter (α := α) m β) :=
-  it.filterMapM (fun b => some <$> f b)
+  (it.filterMapM (fun b => some <$> f b) : Iter m γ)
 
 @[inline]
 def Iter.filterM [Iterator α m β] [Monad m] (f : β → m (ULift Bool)) (it : Iter (α := α) m β) :=
-  it.filterMapM (fun b => (if ·.down then some b else none) <$> f b)
+  (it.filterMapM (fun b => (if ·.down then some b else none) <$> f b) : Iter m β)
 
 end FilterMapM

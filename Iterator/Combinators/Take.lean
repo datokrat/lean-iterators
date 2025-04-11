@@ -49,21 +49,23 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 def Iter.take [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
-  toIter <| Take.mk n it.inner
+  toIter m <| Take.mk n it.inner
 
-def Take.rel [Iterator α m β] : Take α → Take α → Prop :=
-  InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt) (fun it => (it.remaining, productiveIteratorWF it.inner))
+def Take.rel (m : Type w → Type w') [Iterator α m β] : Take α → Take α → Prop :=
+  InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt)
+    (fun it => (it.remaining, productiveIteratorWF (m := m) it.inner))
 
 theorem Take.rel_of_remaining [Iterator α m β] {it it' : Take α}
-    (h : it'.remaining < it.remaining) : Take.rel it' it :=
+    (h : it'.remaining < it.remaining) : Take.rel m it' it :=
   Prod.Lex.left _ _ h
 
 theorem Take.rel_of_inner [Iterator α m β] {remaining : Nat} {it it' : α}
-    (h : (productiveIteratorWF it').lt (productiveIteratorWF it)) : Take.rel ⟨remaining, it'⟩ ⟨remaining, it⟩ :=
+    (h : (productiveIteratorWF (m := m) it').lt (productiveIteratorWF it)) :
+    Take.rel m ⟨remaining, it'⟩ ⟨remaining, it⟩ :=
   Prod.Lex.right _ h
 
-instance [Iterator α m β] [Monad m] [Productive α] : Finite (Take α) := by
-  refine finite_instIterator _ (rel := Take.rel) ?_ ?_
+instance [Iterator α m β] [Monad m] [Productive α m] : Finite (Take α) m := by
+  refine finite_instIterator _ (rel := Take.rel m) ?_ ?_
   · apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf

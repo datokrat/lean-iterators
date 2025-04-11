@@ -5,17 +5,17 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Basic
-import Iterator.Combinators
+import Iterator.Wrapper
 import Init.Data.Nat.Lemmas
 
 section ListIterator
 
-variable {m : Type u → Type v}
+variable {m : Type w → Type w'}
 
-structure ListIterator (α : Type u) (m : Type u → Type v) where
+structure ListIterator (α : Type u) where
   list : List α
 
-instance [Pure m] : Iterator (ListIterator α m) m α where
+instance [Pure m] : Iterator (ListIterator α) m α where
   yielded it it' a := it.list = a :: it'.list
   skipped it it' := False
   finished it := it.list = []
@@ -28,11 +28,11 @@ Returns a finite iterator for the given list.
 The iterator yields the elements of the list in order and then terminates.
 -/
 @[inline]
-def List.iter {α} (l : List α) (m := Id) [Pure m] : Iter (α := ListIterator α m) m α :=
-  toIter { list := l }
+def List.iter {α : Type u} (l : List α) (m := by exact Id.{u}) [Pure m] : Iter (α := ListIterator α) m α :=
+  toIter m { list := l }
 
 theorem ListIterator.subrelation [Pure m] :
-    Subrelation (FiniteIteratorWF.lt (α := ListIterator α m))
+    Subrelation (FiniteIteratorWF.lt (α := ListIterator α) (m := m))
       (InvImage WellFoundedRelation.rel (ListIterator.list ∘ FiniteIteratorWF.inner)) := by
   intro x y hlt
   simp_wf
@@ -40,7 +40,7 @@ theorem ListIterator.subrelation [Pure m] :
   cases hlt
   simp_all
 
-instance [Pure m] : Finite (ListIterator α m) where
+instance [Pure m] : Finite (ListIterator α) m where
   wf := ListIterator.subrelation.wf (InvImage.wf _ WellFoundedRelation.wf)
 
 end ListIterator
@@ -51,10 +51,10 @@ universe u v
 
 variable {m : Type u → Type v}
 
-structure UnfoldIterator (α : Type u) (f : α → α) (m : Type u → Type v) where
+structure UnfoldIterator (α : Type u) (f : α → α) where
   next : α
 
-instance [Pure m] : Iterator (UnfoldIterator α f m) m α where
+instance [Pure m] : Iterator (UnfoldIterator α f) m α where
   yielded it it' a := it.next = a ∧ it'.next = f a
   skipped _ _ := False
   finished _ := False
@@ -65,10 +65,10 @@ Creates an infinite, productive iterator. First it yields `init`.
 If the last step yielded `a`, the next will yield `f a`.
 -/
 @[inline]
-def Iter.unfold {α : Type u} (init : α) (f : α → α) (m : Type u → Type v := by exact Id) [Pure m] :=
-  toIter <| UnfoldIterator.mk (f := f) (m := m) init
+def Iter.unfold (m : Type w → Type w' := by exact Id) {α : Type u} (init : α) (f : α → α) [Pure m] :=
+  toIter m <| UnfoldIterator.mk (f := f) init
 
-instance [Pure m] : Productive (UnfoldIterator α f m) where
+instance [Pure m] : Productive (UnfoldIterator α f) m where
   wf := by
     refine ⟨?_⟩
     intro x

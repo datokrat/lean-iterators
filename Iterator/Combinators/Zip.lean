@@ -10,41 +10,39 @@ section ZipH
 
 universe u₁ u₂ v₁ v₂ w₁ w₂ w₃
 
-variable {α₁ : Type u₁} {β₁ : Type v₁} {m₁ : Type max u₁ v₁ → Type w₁} [Iterator α₁ m₁ β₁]
-  {α₂ : Type u₂} {β₂ : Type v₂} {m₂ : Type max u₂ v₂ → Type w₂} [Iterator α₂ m₂ β₂]
-  {n : Type max u₁ v₁ u₂ v₂ → Type w₃}
-  {fm₁ : ∀ ⦃δ δ'⦄, (δ → δ') → m₁ δ → n δ'} {fm₂ : ∀ ⦃δ δ'⦄, (δ → δ') → m₂ δ → n δ'}
+variable {m : Type w → Type w'}
+  {α₁ : Type u₁} {β₁ : Type v₁} [Iterator α₁ m β₁]
+  {α₂ : Type u₂} {β₂ : Type v₂} [Iterator α₂ m β₂]
 
-structure ZipH (α₁ : Type u₁) (β₁ : Type v₁) (α₂ : Type u₂)
-    (fm₁ : ∀ ⦃δ δ'⦄, (δ → δ') → m₁ δ → n δ') (fm₂ : ∀ ⦃δ δ'⦄, (δ → δ') → m₂ δ → n δ') where
+structure ZipH (α₁ : Type u₁) (β₁ : Type v₁) (α₂ : Type u₂) where
   left : α₁
   memoizedLeft : Option β₁
   right : α₂
 
-instance [Iterator α₁ m₁ β₁] [Iterator α₂ m₂ β₂] [Monad m₁] [Monad m₂] [Monad n] :
-    Iterator (ZipH.{u₁, u₂, v₁, v₂, w₁, w₂, w₃} α₁ β₁ α₂ fm₁ fm₂) n (β₁ × β₂) :=
+instance [Iterator α₁ m β₁] [Iterator α₂ m β₂] [Monad m] :
+    Iterator (ZipH α₁ β₁ α₂) m (β₁ × β₂) :=
   Iteration.instIterator fun it => do
       match it.memoizedLeft with
       | none =>
-        matchStepH.{max u₂ v₂} fm₁ it.left
+        matchStepH it.left
           (fun it₁' b₁ => pure <| .skip ⟨it₁', some b₁, it.right⟩ ⟨⟩)
           (fun it₁' => pure <| .skip ⟨it₁', none, it.right⟩ ⟨⟩)
           (pure <| .done ⟨⟩)
       | some b₁ =>
-        matchStepH.{max u₁ v₁} fm₂ it.right
+        matchStepH it.right
           (fun it₂' b₂ => pure <| .yield ⟨it.left, none, it₂'⟩ (b₁, b₂) ⟨⟩)
           (fun it₂' => pure <| .skip ⟨it.left, some b₁, it₂'⟩ ⟨⟩)
           (pure <| .done ⟨⟩)
 
 @[inline]
-def Iter.zipH [Monad m₁] [Monad m₂] [Monad n]
-    (left : Iter (α := α₁) m₁ β₁) (right : Iter (α := α₂) m₂ β₂)
-    (fm₁ : ∀ ⦃δ δ'⦄, (δ → δ') → m₁ δ → n δ') (fm₂ : ∀ ⦃δ δ'⦄, (δ → δ') → m₂ δ → n δ') :
-    Iter (α := ZipH α₁ β₁ α₂ fm₁ fm₂) n (β₁ × β₂) :=
+def Iter.zipH [Monad m]
+    (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :
+    Iter (α := ZipH α₁ β₁ α₂) m (β₁ × β₂) :=
   ⟨left.inner, none, right.inner⟩
 
 -- TODO: put this into core. This is also duplicated in FlatMap
-theorem ZipH.wellFounded_optionLt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
+theorem ZipH.wellFounded_optionLt {α} {rel : α → α → Prop} (h : WellFounded rel) :
+    WellFounded (Option.lt rel) := by
   refine ⟨?_⟩
   intro x
   have hn : Acc (Option.lt rel) none := by
@@ -62,29 +60,30 @@ theorem ZipH.wellFounded_optionLt {α} {rel : α → α → Prop} (h : WellFound
     · exact hn
     · exact ih _ hyx'
 
-def ZipH.rel₁ : ZipH α₁ β₁ α₂ fm₁ fm₂ → ZipH α₁ β₁ α₂ fm₁ fm₂ → Prop :=
+variable (m) in
+def ZipH.rel₁ : ZipH α₁ β₁ α₂ → ZipH α₁ β₁ α₂ → Prop :=
   InvImage (Prod.Lex
       FiniteIteratorWF.lt
       (Prod.Lex (Option.lt emptyRelation) ProductiveIteratorWF.lt))
-    (fun it => (finiteIteratorWF it.left, (it.memoizedLeft, productiveIteratorWF it.right)))
+    (fun it => (finiteIteratorWF it.left (m := m), (it.memoizedLeft, productiveIteratorWF (m := m) it.right)))
 
-theorem ZipH.rel₁_of_left {it' it : ZipH α₁ β₁ α₂ fm₁ fm₂}
-    (h : (finiteIteratorWF it'.left).lt (finiteIteratorWF it.left)) : ZipH.rel₁ it' it :=
+theorem ZipH.rel₁_of_left {it' it : ZipH α₁ β₁ α₂}
+    (h : (finiteIteratorWF it'.left (m := m)).lt (finiteIteratorWF it.left)) : ZipH.rel₁ m it' it :=
   Prod.Lex.left _ _ h
 
 theorem ZipH.rel₁_of_memoizedLeft {left : α₁} {b' b : Option β₁} {right' right : α₂}
     (h : Option.lt emptyRelation b' b) :
-    ZipH.rel₁ (fm₁ := fm₁) (fm₂ := fm₂) ⟨left, b', right'⟩ ⟨left, b, right⟩ :=
+    ZipH.rel₁ m ⟨left, b', right'⟩ ⟨left, b, right⟩ :=
   Prod.Lex.right _ <| Prod.Lex.left _ _ h
 
 theorem ZipH.rel₁_of_right {left : α₁} {b : Option β₁} {it' it : α₂}
-    (h : (productiveIteratorWF it').lt (productiveIteratorWF it)) :
-    ZipH.rel₁ (fm₁ := fm₁) (fm₂ := fm₂) ⟨left, b, it'⟩ ⟨left, b, it⟩ :=
+    (h : (productiveIteratorWF it' (m := m)).lt (productiveIteratorWF it)) :
+    ZipH.rel₁ m ⟨left, b, it'⟩ ⟨left, b, it⟩ :=
   Prod.Lex.right _ <| Prod.Lex.right _ h
 
-instance [Monad m₁] [Monad m₂] [Monad n] [Finite α₁] [Productive α₂] :
-    Finite (ZipH α₁ β₁ α₂ fm₁ fm₂) := by
-  refine finite_instIterator _ (rel := ZipH.rel₁) ?_ ?_
+instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
+    Finite (ZipH α₁ β₁ α₂) m := by
+  refine finite_instIterator _ (rel := ZipH.rel₁ m) ?_ ?_
   · apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
@@ -136,29 +135,30 @@ theorem ZipH.wellFounded_lt_with_top {α} {r : α → α → Prop} (h : WellFoun
     | none => contradiction
     | some x'' => exact ih x'' hlt'
 
-def ZipH.rel₂ : ZipH α₁ β₁ α₂ fm₁ fm₂ → ZipH α₁ β₁ α₂ fm₁ fm₂ → Prop :=
+variable (m) in
+def ZipH.rel₂ : ZipH α₁ β₁ α₂ → ZipH α₁ β₁ α₂ → Prop :=
   InvImage (Prod.Lex
       FiniteIteratorWF.lt
       (Prod.Lex (ZipH.lt_with_top emptyRelation) ProductiveIteratorWF.lt))
-    (fun it => (finiteIteratorWF it.right, (it.memoizedLeft, productiveIteratorWF it.left)))
+    (fun it => (finiteIteratorWF it.right (m := m), (it.memoizedLeft, productiveIteratorWF it.left (m := m))))
 
-theorem ZipH.rel₂_of_right {it' it : ZipH α₁ β₁ α₂ fm₁ fm₂}
-    (h : (finiteIteratorWF it'.right).lt (finiteIteratorWF it.right)) : ZipH.rel₂ it' it :=
+theorem ZipH.rel₂_of_right {it' it : ZipH α₁ β₁ α₂}
+    (h : (finiteIteratorWF it'.right).lt (finiteIteratorWF it.right (m := m))) : ZipH.rel₂ m it' it :=
   Prod.Lex.left _ _ h
 
 theorem ZipH.rel₂_of_memoizedLeft {left' left : α₁} {b' b : Option β₁} {right : α₂}
     (h : ZipH.lt_with_top emptyRelation b' b) :
-    ZipH.rel₂ (fm₁ := fm₁) (fm₂ := fm₂) ⟨left', b', right⟩ ⟨left, b, right⟩ :=
+    ZipH.rel₂ m ⟨left', b', right⟩ ⟨left, b, right⟩ :=
   Prod.Lex.right _ <| Prod.Lex.left _ _ h
 
 theorem ZipH.rel₂_of_left {left' left : α₁} {b : Option β₁} {right : α₂}
-    (h : (productiveIteratorWF left').lt (productiveIteratorWF left)) :
-    ZipH.rel₂ (fm₁ := fm₁) (fm₂ := fm₂) ⟨left', b, right⟩ ⟨left, b, right⟩ :=
+    (h : (productiveIteratorWF left' (m := m)).lt (productiveIteratorWF left)) :
+    ZipH.rel₂ m ⟨left', b, right⟩ ⟨left, b, right⟩ :=
   Prod.Lex.right _ <| Prod.Lex.right _ h
 
-instance [Monad m₁] [Monad m₂] [Monad n] [Productive α₁] [Finite α₂] :
-    Finite (ZipH α₁ β₁ α₂ fm₁ fm₂) := by
-  refine finite_instIterator _ (rel := ZipH.rel₂) ?_ ?_
+instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
+    Finite (ZipH α₁ β₁ α₂) m := by
+  refine finite_instIterator _ (rel := ZipH.rel₂ m) ?_ ?_
   · apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
@@ -189,11 +189,12 @@ instance [Monad m₁] [Monad m₂] [Monad n] [Productive α₁] [Finite α₂] :
 
 end ZipH
 
+-- TODO: Does it make sense to have this specialized version?
 section Zip
 
 universe u v
 
-variable {α₁ α₂ : Type u} {β₁ β₂ : Type v} {m : Type max u v → Type max u v}
+variable {α₁ α₂ : Type u} {β₁ β₂ : Type v} {m : Type w → Type w'}
   [Monad m] [Iterator α₁ m β₁] [Iterator α₂ m β₂]
 
 /--
@@ -225,6 +226,6 @@ _TODO:_ implement the `Productive` instance
 This combinator incurs an additional O(1) cost with each output of `left` or `right`.
 -/
 def Iter.zip (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :=
-  Iter.zipH left right (fun ⦃_ _⦄ => Functor.map) (fun ⦃_ _⦄ => Functor.map)
+  (Iter.zipH left right : Iter m (β₁ × β₂))
 
 end Zip

@@ -50,13 +50,13 @@ Currently, this combinator incurs an additional O(1) cost with each output of `i
 does not drop any elements anymore.
 -/
 def Iter.drop [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
-  toIter <| Drop.mk n it.inner
+  toIter m <| Drop.mk n it.inner
 
-def Drop.rel [Iterator α m β] : Drop α → Drop α → Prop :=
-  InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ Drop.inner)
+def Drop.rel (m : Type w → Type w') [Iterator α m β] : Drop α → Drop α → Prop :=
+  InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ Drop.inner)
 
-instance [Iterator α m β] [Monad m] [Finite α] : Finite (Drop α) := by
-  refine finite_instIterator _ (rel := Drop.rel) ?_ ?_
+instance [Iterator α m β] [Monad m] [Finite α m] : Finite (Drop α) m := by
+  refine finite_instIterator (m := m) _ (rel := Drop.rel m) ?_ ?_
   · apply InvImage.wf
     exact Finite.wf
   · intro it it' h

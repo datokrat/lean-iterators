@@ -1,9 +1,14 @@
 import Iterator
 import Std.Time
 
+-- TODO
+-- set_option pp.universes true in
+-- def firstOfEach (l : List (List α)) :=
+--   Iter.flatMap (Iter.take 1 ·.iter) l.iter |>.toList
+
 def staggeredCounting : List Nat :=
-  Iter.unfold 0 (· + 1) |>.take 5 |>.flatMap
-    (fun i => Iter.unfold 0 (· + 1) |>.take i) |>.toList
+  Iter.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
+    (fun i => Iter.unfold Id 0 (· + 1) |>.take i) |>.toList
 
 /-- info: [0, 0, 1, 0, 1, 2, 0, 1, 2, 3] -/
 #guard_msgs in
