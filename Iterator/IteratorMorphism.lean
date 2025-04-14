@@ -30,70 +30,70 @@ theorem IteratorMorphism.pullbackFinite [Finite α' m'] (φ : IteratorMorphism �
       · exact Or.inl ⟨φ.mapValue b, φ.preserves_yielded.mpr h⟩
       · exact Or.inr (φ.preserves_skipped.mpr h)
 
-@[inline]
-def Iterator.uLiftUp (α : Type u) {β : Type v} {m} [Functor m] [Iterator α m β] :
-    Iterator (ULift.{v} α) m (ULift.{u} β) where
-  yielded it it' b := Iterator.yielded m it.down it'.down b.down
-  skipped it it' := Iterator.skipped m it.down it'.down
-  finished it := Iterator.finished m it.down
-  step it :=
-    (match · with
-      | .yield it' b h => .yield (.up it') (.up b) h
-      | .skip it' h => .skip (.up it') h
-      | .done h => .done h) <$> Iterator.step it.down
+-- @[inline]
+-- def Iterator.uLiftUp (α : Type u) {β : Type v} {m} [Functor m] [Iterator α m β] :
+--     Iterator (ULift.{v} α) m (ULift.{u} β) where
+--   yielded it it' b := Iterator.yielded m it.down it'.down b.down
+--   skipped it it' := Iterator.skipped m it.down it'.down
+--   finished it := Iterator.finished m it.down
+--   step it :=
+--     (match · with
+--       | .yield it' b h => .yield (.up it') (.up b) h
+--       | .skip it' h => .skip (.up it') h
+--       | .done h => .done h) <$> Iterator.step it.down
 
-@[inline]
-def Iterator.uLiftDown (α : Type u) {β : Type v} {m : Type (max u v) → Type (max u v)}
-    [Functor m] [Iterator (ULift.{v} α) m (ULift.{u} β)] :
-    Iterator α m β where
-  yielded it it' b := Iterator.yielded m (ULift.up it) (ULift.up it') (ULift.up b)
-  skipped it it' := Iterator.skipped m (ULift.up it) (ULift.up it')
-  finished it := Iterator.finished m (ULift.up it)
-  step it :=
-    (match · with
-      | .yield it' b h => .yield it'.down b.down h
-      | .skip it' h => .skip it'.down h
-      | .done h => .done h) <$> Iterator.step (ULift.up it)
+-- @[inline]
+-- def Iterator.uLiftDown (α : Type u) {β : Type v} {m : Type (max u v) → Type (max u v)}
+--     [Functor m] [Iterator (ULift.{v} α) m (ULift.{u} β)] :
+--     Iterator α m β where
+--   yielded it it' b := Iterator.yielded m (ULift.up it) (ULift.up it') (ULift.up b)
+--   skipped it it' := Iterator.skipped m (ULift.up it) (ULift.up it')
+--   finished it := Iterator.finished m (ULift.up it)
+--   step it :=
+--     (match · with
+--       | .yield it' b h => .yield it'.down b.down h
+--       | .skip it' h => .skip it'.down h
+--       | .done h => .done h) <$> Iterator.step (ULift.up it)
 
-class Iterator.ULiftable (α : Type u) {β : Type v} (m)
-    [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] where
-  exists_uLift :
-    ∃ φ : IteratorMorphism α m (ULift.{v} α) m, φ.mapIterator = ULift.up ∧ φ.mapValue = ULift.up
+-- class Iterator.ULiftable (α : Type u) {β : Type v} (m)
+--     [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] where
+--   exists_uLift :
+--     ∃ φ : IteratorMorphism α m (ULift.{v} α) m, φ.mapIterator = ULift.up ∧ φ.mapValue = ULift.up
 
-attribute [instance] Iterator.uLiftUp in
-instance {α β m} [Functor m] [Iterator α m β] : Iterator.ULiftable α m where
-  exists_uLift := ⟨⟨ULift.up, ULift.up, Iff.rfl, Iff.rfl, Iff.rfl⟩, rfl, rfl⟩
+-- attribute [instance] Iterator.uLiftUp in
+-- instance {α β m} [Functor m] [Iterator α m β] : Iterator.ULiftable α m where
+--   exists_uLift := ⟨⟨ULift.up, ULift.up, Iff.rfl, Iff.rfl, Iff.rfl⟩, rfl, rfl⟩
 
-attribute [instance] Iterator.uLiftDown in
-instance {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)}
-    [Functor m] [Iterator (ULift.{v} α) m (ULift.{u} β)] : Iterator.ULiftable α m where
-  exists_uLift := by
-    refine ⟨⟨ULift.up, ULift.up, ?_, ?_, ?_⟩, ?_, ?_⟩ <;> simp [Iterator.yielded, Iterator.skipped, Iterator.finished]
+-- attribute [instance] Iterator.uLiftDown in
+-- instance {α : Type u} {β : Type v} {m : Type (max u v) → Type (max u v)}
+--     [Functor m] [Iterator (ULift.{v} α) m (ULift.{u} β)] : Iterator.ULiftable α m where
+--   exists_uLift := by
+--     refine ⟨⟨ULift.up, ULift.up, ?_, ?_, ?_⟩, ?_, ?_⟩ <;> simp [Iterator.yielded, Iterator.skipped, Iterator.finished]
 
-def IteratorMorphism.uLiftUp (α : Type u) {β : Type v} {m}
-    [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] [Iterator.ULiftable α m] : IteratorMorphism α m (ULift.{v} α) m where
-  mapIterator := ULift.up
-  mapValue := ULift.up
-  preserves_yielded {it it' b} := by
-    obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
-    simp only [← h, ← h', φ.preserves_yielded]
-  preserves_skipped {it it'} := by
-    obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
-    simp only [← h, ← h', φ.preserves_skipped]
-  preserves_finished {it} := by
-    obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
-    simp only [← h, φ.preserves_finished]
+-- def IteratorMorphism.uLiftUp (α : Type u) {β : Type v} {m}
+--     [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] [Iterator.ULiftable α m] : IteratorMorphism α m (ULift.{v} α) m where
+--   mapIterator := ULift.up
+--   mapValue := ULift.up
+--   preserves_yielded {it it' b} := by
+--     obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
+--     simp only [← h, ← h', φ.preserves_yielded]
+--   preserves_skipped {it it'} := by
+--     obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
+--     simp only [← h, ← h', φ.preserves_skipped]
+--   preserves_finished {it} := by
+--     obtain ⟨φ, h, h'⟩ := inferInstanceAs <| Iterator.ULiftable α m
+--     simp only [← h, φ.preserves_finished]
 
-def IteratorMorphism.uLiftDown (α : Type u) {β : Type v} {m}
-    [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] [Iterator.ULiftable α m] : IteratorMorphism (ULift.{v} α) m α m where
-  mapIterator := ULift.down
-  mapValue := ULift.down
-  preserves_yielded {it it' b} := by
-    rw (occs := [2]) [← ULift.up_down (b := it), ← ULift.up_down (b := it'), ← ULift.up_down (b := b)]
-    exact (uLiftUp α).preserves_yielded.symm
-  preserves_skipped {it it'}:= by
-    rw (occs := [2]) [← ULift.up_down (b := it), ← ULift.up_down (b := it')]
-    exact (uLiftUp α).preserves_skipped.symm
-  preserves_finished {it} := by
-    rw (occs := [2]) [← ULift.up_down (b := it)]
-    exact (uLiftUp α).preserves_finished.symm
+-- def IteratorMorphism.uLiftDown (α : Type u) {β : Type v} {m}
+--     [Iterator α m β] [Iterator (ULift.{v} α) m (ULift.{u} β)] [Iterator.ULiftable α m] : IteratorMorphism (ULift.{v} α) m α m where
+--   mapIterator := ULift.down
+--   mapValue := ULift.down
+--   preserves_yielded {it it' b} := by
+--     rw (occs := [2]) [← ULift.up_down (b := it), ← ULift.up_down (b := it'), ← ULift.up_down (b := b)]
+--     exact (uLiftUp α).preserves_yielded.symm
+--   preserves_skipped {it it'}:= by
+--     rw (occs := [2]) [← ULift.up_down (b := it), ← ULift.up_down (b := it')]
+--     exact (uLiftUp α).preserves_skipped.symm
+--   preserves_finished {it} := by
+--     rw (occs := [2]) [← ULift.up_down (b := it)]
+--     exact (uLiftUp α).preserves_finished.symm

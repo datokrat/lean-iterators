@@ -29,26 +29,25 @@ error: failed to synthesize
         fun ⦃x x_1⦄ => Functor.map))
 Additional diagnostic information may be available using the `set_option diagnostics true` command.
 -/
-#guard_msgs in
-def notTerminating : List Nat :=
-  Iter.unfold 0 (· + 1) |>.take 5 |>.flatMap
-    (fun i => Iter.unfold 0 (fun x => x + 1)) |>.toList
+-- #guard_msgs in
+-- def notTerminating : List Nat :=
+--   Iter.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
+--     (fun i => Iter.unfold Id 0 (fun x => x + 1)) |>.toList
 
 -- The following works -- but don't uncomment it except you want to heat your room for 15s with the compiler:
 -- But it's nice that it works since such dependent flat map operations require boxing in non-dependent languages such
 -- as Rust
-/-
--- def dependentFlatMap (l : List (List Nat)) : List Nat :=
---   let it := Iter.unfold 2 (· + 1) Id |>.zip l.iter -- It's not nice that this fails if we don't provide Id explicitly.
---   it.flatMapD (fun (x : Nat × List Nat) => x.2.iter.filter fun y => y % x.1 = 0) |>.toList
+
+def dependentFlatMap (l : List (List Nat)) : List Nat :=
+  let it := Iter.unfold Id 2 (· + 1) |>.zip (l.iter Id.{0}) -- It's not nice that this fails if we don't provide Id explicitly.
+  it.flatMapD (fun (x : Nat × List Nat) => (x.2.iter Id).filter fun y => y % x.1 = 0) |>.toList
 
 /-- info: [2, 6, 9] -/
 #guard_msgs in
 #eval dependentFlatMap [[1, 2, 3], [4, 5, 6, 9]]
--/
 
 def addIndices (l : List Nat) : List (Nat × Nat) :=
-  Iter.unfold 0 (· + 1) |>.zip l.iter |>.toList
+  Iter.unfold Id 0 (· + 1) |>.zip (l.iter Id) |>.toList
 
 /-- info: [(0, 3), (1, 1), (2, 4), (3, 1), (4, 5), (5, 9)] -/
 #guard_msgs in

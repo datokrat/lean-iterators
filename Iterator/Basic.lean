@@ -104,6 +104,8 @@ changes are necessary, this disclaimer will be removed.
   monadic setting.
 -/
 
+universe x
+
 variable {α : Type u} {β : Type v}
 
 inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop) (finished : Prop) where
@@ -121,10 +123,16 @@ class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) w
   yielded : α → α → β → Prop
   skipped : α → α → Prop
   finished : α → Prop
-  step : (a : α) → OverT m (IterStep α β (yielded a) (skipped a) (finished a))
 
 abbrev IterStep.for {α β} (m) [Iterator α m β] (it : α) :=
   IterStep α β (Iterator.yielded m it) (Iterator.skipped m it) (Iterator.finished m it)
+
+class SteppableIterator (α : Type u) (m : Type w → Type w') (β : (outParam (Type v))) [Iterator α m β] where
+  intoMonad : ∀ n : Type max u v → Type x, [Monad n] →
+    (bindH : ∀ {γ δ}, m γ → (γ → n δ) → n δ) → (it : α) → n (IterStep.for m it)
+
+def USwitchT (m : Type w → Type w') (α : Type u) :=
+  ∀ n : Type u → Type x, [Monad n] → (bindH : ∀ {γ δ}, m γ → (γ → n δ) → n δ) → n α
 
 section Finite
 

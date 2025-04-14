@@ -26,11 +26,23 @@ section FilterMapMH
 universe u' v' u v
 
 structure FilterMapMH (α : Type u) {β : Type v} {β' : Type v'}
-    {m : Type w → Type w'} (f : β → OverT m (Option β')) where
+    {m : Type w → Type w'} (f : β → USwitchT m (Option β')) where
   inner : α
 
-variable {α : Type u} {β : Type v} {β' : Type v'} {m : Type w → Type w'} [Monad m] [Iterator α m β]
+variable {α : Type u} {β : Type v} {β' : Type v'} {m : Type w → Type w'}
+    [Monad m] [Iterator α m β]
     {f : β → OverT m (Option β')}
+
+instance [SteppableIterator α m β] : SimpleIterator (FilterMapMH α f) m β' where
+  step it :=
+    matchStepH it.inner
+      (fun it' b => IterationT.mapH
+        (match · with
+          | none => .skip ⟨it'⟩ ⟨⟩
+          | some c => .yield ⟨it'⟩ c ⟨⟩)
+        (monadLift (f b)))
+      (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
+      (pure <| .done ⟨⟩)
 
 instance : Iterator (FilterMapMH α f) m β' :=
   Iteration.instIterator fun it =>

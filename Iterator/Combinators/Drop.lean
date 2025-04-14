@@ -10,18 +10,31 @@ import Iterator.AbstractIteration
 This file provides the iterator combinator `Iter.drop`.
 -/
 
+variable {α : Type u} {m : Type w → Type w'} {β : Type v}
+
 structure Drop (α : Type u) where
   remaining : Nat
   inner : α
 
-instance [Iterator α m β] [Monad m] : Iterator (Drop α) m β :=
-  Iteration.instIterator fun it => do
-    matchStep it.inner
+instance [Monad m] [Iterator α m β] [SteppableIterator α m β] :
+    SimpleIterator (Drop α) m β where
+  step it := matchStep (m := m) it.inner
       (fun it' b => match it.remaining with
         | 0 => pure <| .yield ⟨0, it'⟩ b ⟨⟩
         | remaining' + 1 => pure <| .skip ⟨remaining', it'⟩ ⟨⟩)
       (fun it' => pure <| .skip ⟨it.remaining, it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
+
+instance [Monad m] [Iterator α m β] [SteppableIterator.{max u v x} α m β] [SteppableIterator.{max u v y} α m β] :
+    SimpleIterator.CompatibleUniverses.{x, y} (Drop α) m where
+  compatible it := by
+    simp [SimpleIterator.step]
+    simp only [matchStep, matchStepH, IterationT.bindH]
+    ext
+    rw [iff_iff_eq]
+    congr
+    ext
+    split <;> (try split) <;> rfl
 
 /--
 Given an iterator `it` and a natural number `n`, `it.drop n` is an iterator that forwards all of
@@ -49,23 +62,25 @@ _TODO_: prove `Productive`
 Currently, this combinator incurs an additional O(1) cost with each output of `it`, even when the iterator
 does not drop any elements anymore.
 -/
-def Iter.drop [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
+def Iter.drop [Iterator α m β] [SteppableIterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
   toIter m <| Drop.mk n it.inner
 
 def Drop.rel (m : Type w → Type w') [Iterator α m β] : Drop α → Drop α → Prop :=
   InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ Drop.inner)
 
-instance [Iterator α m β] [Monad m] [Finite α m] : Finite (Drop α) m := by
-  refine finite_instIterator (m := m) _ (rel := Drop.rel m) ?_ ?_
-  · apply InvImage.wf
+instance [Iterator α m β] [SteppableIterator α m β] [Monad m] [Finite α m] : SimpleIterator.Finite (Drop α) m where
+  rel := Drop.rel m
+  wf := by
+    apply InvImage.wf
     exact Finite.wf
-  · intro it it' h
-    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStep h
+  subrelation {it it'} h := by
+    simp only [SimpleIterator.step] at h
+    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
     · split at h
-      · cases up_successor_yield.mp h
+      · cases successor_yield.mp h
         exact Or.inl ⟨_, hy⟩
-      · cases up_successor_skip.mp h
+      · cases successor_skip.mp h
         exact Or.inl ⟨_, hy⟩
-    · cases up_successor_skip.mp h
+    · cases successor_skip.mp h
       exact Or.inr hs
-    · cases up_successor_done.mp h
+    · cases successor_done.mp h

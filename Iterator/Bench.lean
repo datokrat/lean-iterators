@@ -13,30 +13,37 @@ open Std
 
 section ListIterator
 
-set_option trace.compiler.ir true in
-@[noinline]
-def sum (l : List Nat) : Nat := Id.run do
-  let mut it := l.iter Id
-  let mut sum := 0
-  while true do
-    match it.step with
-    | .yield it' n _ =>
-      sum := sum + n
-      it := it'
-    | .skip it' _ =>
-      it := it'
-    | .done _ =>
-      break
-  return sum
+-- set_option trace.compiler.ir true in
+-- @[noinline]
+-- def sum (l : List Nat) : Nat := Id.run do
+--   let mut it := l.iter Id
+--   let mut sum := 0
+--   while true do
+--     match it.step with
+--     | .yield it' n _ =>
+--       sum := sum + n
+--       it := it'
+--     | .skip it' _ =>
+--       it := it'
+--     | .done _ =>
+--       break
+--   return sum
 
 end ListIterator
 
 section FilterMap
 
 set_option trace.compiler.ir.result true in
+def steppi (l : List Nat) : Nat :=
+  let x : Iter (α := ListIterator Nat) Id.{0} Nat := sorry
+  match (l.iter Id |>.step).run with
+  | .yield it' x _ => x
+  | .skip it' _ => 1
+  | .done _ => 0
+
 @[noinline]
 def sumrec (l : List Nat) : Nat :=
-  go (l.iter Id |>.map (2 * ·)) 0
+  go (l.iter Id) 0
 where
   go it acc :=
     match it.step with

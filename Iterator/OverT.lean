@@ -27,7 +27,10 @@ def OverT.bindH {m : Type v → Type v'} [Monad m] {β : Type w} {β' : Type w'}
       f := fun a => (f (x.f a.1)).f a.2 }
 
 instance (m : Type v → Type v') [Pure m] : Pure (OverT.{w} m) where
-  pure x := { α := PUnit, el := pure ⟨⟩, f := fun _ => x }
+  pure x := { α := PUnit, el := pure ⟨⟩, f := c x }
+where
+  @[inline]
+  c {α} (x : α) (y : PUnit) := x
 
 instance (m : Type v → Type v') : Functor (OverT.{w} m) where
   map := OverT.mapH
