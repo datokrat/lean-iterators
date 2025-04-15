@@ -24,6 +24,9 @@ instance [Monad m] : Monad (IterationT m) where
                   let a ← (f b).computation
                   return ⟨a.1, b.1, a.2, b.2⟩ }
 
+instance (m) [Monad m] : MonadLift m (IterationT m) where
+  monadLift t := { property := fun _ => True, computation := (⟨·, True.intro⟩) <$> t }
+
 -- @[inline]
 -- def IterationT.mapH {γ : Type w} {m : Type w → Type w'} [Monad m]
 --     {δ : Type w}

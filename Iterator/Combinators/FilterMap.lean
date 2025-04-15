@@ -25,58 +25,49 @@ section FilterMapMH
 
 universe u' v' u v
 
-structure FilterMapMH (α : Type u) {β : Type v} {β' : Type v'}
-    {m : Type w → Type w'} (f : β → USwitchT m (Option β')) where
+structure FilterMapMH (α : Type u) {β : Type v} (γ : Type v') {γ' : Type w} (γEquiv : Equiv γ γ')
+    {m : Type w → Type w'} (f : β → m (Option γ')) where
   inner : α
 
-variable {α : Type u} {β : Type v} {β' : Type v'} {m : Type w → Type w'}
+variable {α : Type u} {β : Type v} {γ : Type v'} {γ' : Type w} {m : Type w → Type w'}
     [Monad m] [Iterator α m β]
-    {f : β → OverT m (Option β')}
+    {γEquiv : Equiv γ γ'} {f : β → m (Option γ')}
 
-instance [SteppableIterator α m β] : SimpleIterator (FilterMapMH α f) m β' where
+instance : SimpleIterator (FilterMapMH α γ γEquiv f) m γ where
+  α' := FilterMapMH (Iterator.α' α m) γ γEquiv f
+  β' := γ'
+  αEquiv := sorry
+  βEquiv := γEquiv
   step it :=
-    matchStepH it.inner
-      (fun it' b => IterationT.mapH
+    matchStep it.inner
+      (fun it' b =>
         (match · with
           | none => .skip ⟨it'⟩ ⟨⟩
           | some c => .yield ⟨it'⟩ c ⟨⟩)
-        (monadLift (f b)))
+        <$> (monadLift (f b)))
       (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
 
-instance : Iterator (FilterMapMH α f) m β' :=
-  Iteration.instIterator fun it =>
-    matchStepH it.inner
-      (fun it' b => Iteration.mapH
-        (match · with
-          | none => .skip ⟨it'⟩ ⟨⟩
-          | some c => .yield ⟨it'⟩ c ⟨⟩)
-        (monadLift (f b)))
-      (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
-
-instance [Finite α m] : Finite (FilterMapMH α f) m := by
-  refine finite_instIterator (α := FilterMapMH α f) (β := β') (m := m) (rel := ?_) ?_ ?_ ?_
-  · exact InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ FilterMapMH.inner)
-  · apply InvImage.wf
-    exact Finite.wf
-  · intro it it' h
-    replace h := prop_successor_matchStepH h
-    obtain ⟨it'', b, h, h'⟩ | ⟨it'', h, h'⟩ | ⟨h, h'⟩ := h
-    · simp only [Iteration.prop_map, Iteration.prop_mapH, Iteration.prop_bindH] at h'
-      obtain ⟨a, ha, b, h'⟩ := h'
-      split at h'
-      · cases up_successor_skip (m := m) |>.mp ⟨a, ha, h'.1⟩
-        apply Or.inl ⟨_, h⟩
-      · cases up_successor_yield (m := m) |>.mp ⟨a, ha, h'.1⟩
-        apply Or.inl ⟨_, h⟩
-    · cases up_successor_skip.mp h'
-      exact Or.inr h
-    · cases up_successor_done.mp h'
+-- TODO: This proof needs to use internals of IterationT instead of relying on successor_yield etc.
+instance [Finite α m] : SimpleIterator.Finite (FilterMapMH α γ γEquiv f) m where
+  rel := InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ FilterMapMH.inner)
+  wf := InvImage.wf _ Finite.wf
+  subrelation {it it'} h := by
+    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
+    · simp only [Functor.map, Function.comp_apply] at h
+      obtain ⟨h, hb, a, rfl, h'⟩ := h
+      split at hb
+      · cases hb
+        apply Or.inl ⟨_, hy⟩
+      · cases hb
+        apply Or.inl ⟨_, hy⟩
+    · cases successor_skip.mp h
+      exact Or.inr hs
+    · cases successor_done.mp h
 
 @[inline]
-def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → OverT m (Option β')) (it : α) :
-    FilterMapMH α f :=
+def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → ContT m (Option γ') (Option γ)) (it : Iterator.α' α m) :
+    FilterMapMH (Iterator.α' α m) γ γEquiv (fun b => f b (pure <| ·.map γEquiv.hom)) :=
   ⟨it⟩
 
 /--
@@ -103,9 +94,8 @@ it.filterMapMH     ---a'-----c'-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → OverT m (Option β')) (it : Iter (α := α) m β) :
-    Iter (α := FilterMapMH α f) m β' :=
-  toIter m <| Iterator.filterMapMH f it.inner
+def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → ContT m (Option γ') (Option γ)) (it : Iter (α := α) m β) :=
+  ((toIter (α := FilterMapMH α γ γEquiv (fun b => f b (pure <| ·.map γEquiv.hom))) m <| Iterator.filterMapMH f it.inner) : Iter m γ)
 
 /--
 Given an iterator `it`, a monadic mapping function `f` and a monad transformation `mf`,

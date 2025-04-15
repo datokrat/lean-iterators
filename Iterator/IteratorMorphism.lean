@@ -7,14 +7,14 @@ prelude
 import Iterator.Basic
 
 class IteratorMorphism (α m α' m') {β β'} [Iterator α m β] [Iterator α' m' β'] where
-    mapIterator : α → α'
-    mapValue : β → β'
+    mapIterator : Iterator.α' α m → Iterator.α' α' m'
+    mapValue : Iterator.β' α m → Iterator.β' α' m'
     preserves_yielded {it it' b} :
-      Iterator.yielded m' (mapIterator it) (mapIterator it') (mapValue b) ↔ Iterator.yielded m it it' b := by rfl
+      Iterator.yielded (mapIterator it) (mapIterator it') (mapValue b) ↔ Iterator.yielded it it' b := by rfl
     preserves_skipped {it it'} :
-      Iterator.skipped m' (mapIterator it) (mapIterator it') ↔ Iterator.skipped m it it' := by rfl
+      Iterator.skipped (mapIterator it) (mapIterator it') ↔ Iterator.skipped it it' := by rfl
     preserves_finished {it} :
-      Iterator.finished m' (mapIterator it) ↔ Iterator.finished m it := by rfl
+      Iterator.done (mapIterator it) ↔ Iterator.done it := by rfl
 
 variable {α m β α' m' β'} [Iterator α m β] [Iterator α' m' β']
 
