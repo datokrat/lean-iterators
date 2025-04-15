@@ -6,22 +6,22 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 
-class IteratorMorphism (α m α' m') {β β'} [Iterator α m β] [Iterator α' m' β'] where
-    mapIterator : Iterator.α' α m → Iterator.α' α' m'
-    mapValue : Iterator.β' α m → Iterator.β' α' m'
+class IteratorMorphism (α₁ m₁ α₂ m₂) {α₁' β₁ α₂' β₂} [Iterator α₁ α₁' m₁ β₁] [Iterator α₂ α₂' m₂ β₂] where
+    mapIterator : α₁ → α₂
+    mapValue : Iterator.βInternal α₁ m₁ → Iterator.βInternal α₂ m₂
     preserves_yielded {it it' b} :
       Iterator.yielded (mapIterator it) (mapIterator it') (mapValue b) ↔ Iterator.yielded it it' b := by rfl
     preserves_skipped {it it'} :
-      Iterator.skipped (mapIterator it) (mapIterator it') ↔ Iterator.skipped it it' := by rfl
+      Iterator.skipped m₂ (mapIterator it) (mapIterator it') ↔ Iterator.skipped m₁ it it' := by rfl
     preserves_finished {it} :
-      Iterator.done (mapIterator it) ↔ Iterator.done it := by rfl
+      Iterator.done m₂ (mapIterator it) ↔ Iterator.done m₁ it := by rfl
 
-variable {α m β α' m' β'} [Iterator α m β] [Iterator α' m' β']
+variable {α₁ α₁' m₁ β₁ α₂ α₂' m₂ β₂} [Iterator α₁ α₁' m₁ β₁] [Iterator α₂ α₂' m₂ β₂]
 
-theorem IteratorMorphism.pullbackFinite [Finite α' m'] (φ : IteratorMorphism α m α' m') : Finite α m where
+theorem IteratorMorphism.pullbackFinite [Finite α₂ m₂] (φ : IteratorMorphism α₁ m₁ α₂ m₂) : Finite α₁ m₁ where
   wf := by
-    let pullbackRel : FiniteIteratorWF α m → FiniteIteratorWF α m → Prop :=
-      InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m') ∘ φ.mapIterator ∘ FiniteIteratorWF.inner)
+    let pullbackRel : FiniteIteratorWF α₁ m₁ → FiniteIteratorWF α₁ m₁ → Prop :=
+      InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m₂) ∘ φ.mapIterator ∘ FiniteIteratorWF.inner)
     refine Subrelation.wf (r := pullbackRel) ?_ (InvImage.wf _ Finite.wf)
     · intro x y hlt
       simp only [pullbackRel, InvImage, FiniteIteratorWF.lt, Function.comp_apply,

@@ -45,29 +45,29 @@ instance (m) [Monad m] : MonadLift m (IterationT m) where
 --         (fun {_ _} x f h => bindH x (f · h))
 --       this (fun c => (fun d => ⟨d.1, c.1, d.2, c.2⟩) <$> (f c).computation n bindH) }
 
+variable {α : Type w} {α' : Type u} {m : Type w → Type w'} {β : Type v}
+
+variable (m) in
 @[always_inline, inline]
-def IterationT.step {α : Type u} (m : Type w → Type w') {β : Type v}
-    [Iterator α m β] [Monad m] (it : Iterator.α' α m) : IterationT m (IterStep.for m it) :=
+def IterationT.step [Iterator α α' m β] [Monad m] (it : α) : IterationT m (IterStep.for m it) :=
   { property
       | .yield it' b _ => Iterator.yielded it it' b
-      | .skip it' _ => Iterator.skipped it it'
-      | .done _ => Iterator.done it,
+      | .skip it' _ => Iterator.skipped m it it'
+      | .done _ => Iterator.done m it,
     computation := (fun step => ⟨step, match step with
         | .yield _ _ h => h
         | .skip _ h => h
         | .done h => h⟩) <$> Iterator.step it }
 
-class SimpleIterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  α' : Type w
-  β' : Type w
-  αEquiv : Equiv α α'
-  βEquiv : Equiv β β'
-  step : α' → IterationT m (RawStep α' β')
+class SimpleIterator (α : Type w) (αInternal : outParam (Type u)) (m : Type w → Type w') (β : outParam (Type v)) where
+  βInternal : Type w
+  αEquiv : Equiv α αInternal
+  βEquiv : Equiv β βInternal
+  step : α → IterationT m (RawStep α βInternal)
 
-instance [SimpleIterator α m β] [Monad m] : Iterator α m β where
-  α' := SimpleIterator.α' α m
-  β' := SimpleIterator.β' α m
-  αEquiv := SimpleIterator.αEquiv
+instance [SimpleIterator α α' m β] [Monad m] : Iterator α α' m β where
+  βInternal := SimpleIterator.βInternal α m
+  αEquiv := SimpleIterator.αEquiv m
   βEquiv := SimpleIterator.βEquiv
   yielded it it' output := SimpleIterator.step (m := m) it |>.property <| .yield it' output ⟨⟩
   skipped it it' := SimpleIterator.step it (m := m) |>.property <| .skip it' ⟨⟩
@@ -77,15 +77,15 @@ instance [SimpleIterator α m β] [Monad m] : Iterator α m β where
     | ⟨.skip it' _, h⟩ => .skip it' h
     | ⟨.done _, h⟩ => .done h) <$> (SimpleIterator.step it).computation
 
-set_option pp.universes true in
-class SimpleIterator.Finite {β : Type v} (α : Type u) (m : Type w → Type w') [SimpleIterator α m β] [Monad m] where
-  rel : Iterator.α' α m → Iterator.α' α m → Prop
+variable (α m) in
+class SimpleIterator.Finite [SimpleIterator α α' m β] [Monad m] where
+  rel : α → α → Prop
   wf : WellFounded rel
-  subrelation : {it it' : Iterator.α' α m} → (IterStep.successor <$> (SimpleIterator.step (m := m) it)).property (some it') → rel it' it
+  subrelation : {it it' : α} → (IterStep.successor <$> (SimpleIterator.step (m := m) it)).property (some it') → rel it' it
 
-instance (α m) [SimpleIterator.{0} α m β] [Monad m] [SimpleIterator.Finite α m] : Finite α m where
+instance [SimpleIterator α α' m β] [Monad m] [SimpleIterator.Finite α m] : Finite α m where
   wf := by
-    refine Subrelation.wf (r := InvImage (SimpleIterator.Finite.rel (α := α) (m := m)) FiniteIteratorWF.inner) ?_ ?_
+    refine Subrelation.wf (r := InvImage (SimpleIterator.Finite.rel α' m β) FiniteIteratorWF.inner) ?_ ?_
     · intro x y h
       apply SimpleIterator.Finite.subrelation
       obtain ⟨b, h⟩ | h := h
@@ -105,32 +105,30 @@ instance (α m) [SimpleIterator.{0} α m β] [Monad m] [SimpleIterator.Finite α
 --   | .skip it' _ => skip it'
 --   | .done _ => done)
 
-variable {α : Type u} {m : Type w → Type w'} {β : Type v}
-
 @[inline]
 def matchStep {γ : Type w} [Monad m]
-    [Iterator α m β] (it : Iterator.α' α m) (yield : Iterator.α' α m → β → IterationT m γ)
-    (skip : Iterator.α' α m → IterationT m γ) (done : IterationT m γ) : IterationT m γ := do
+    [Iterator α α' m β] (it : α) (yield : α → β → IterationT m γ)
+    (skip : α → IterationT m γ) (done : IterationT m γ) : IterationT m γ := do
   match ← IterationT.step m it with
   | .yield it' b _ => yield it' (Iterator.βEquiv.inv b)
   | .skip it' _ => skip it'
   | .done _ => done
 
-theorem successor_yield [Monad m] [Pure m] [SimpleIterator α m β] {it₁ it₂ : SimpleIterator.α' α m} {b} :
+theorem successor_yield [Monad m] [Pure m] [SimpleIterator α α' m β] {it₁ it₂ : α} {b} :
     (IterStep.successor <$>
-        (pure (IterStep.yield it₁ b True.intro) : IterationT m (RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)))).property (some it₂) ↔
+        (pure (IterStep.yield it₁ b True.intro) : IterationT m (RawStep α (SimpleIterator.βInternal α m)))).property (some it₂) ↔
       it₂ = it₁ := by
   simp [Functor.map, Pure.pure, IterStep.successor]
 
-theorem successor_skip [Monad m] [Pure m] [SimpleIterator α m β] {it₁ it₂ : SimpleIterator.α' α m} :
+theorem successor_skip [Monad m] [Pure m] [SimpleIterator α α' m β] {it₁ it₂ : α} :
     (IterStep.successor <$>
-        (pure (IterStep.skip it₁ ⟨⟩) : IterationT m (RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)))).property (some it₂) ↔
+        (pure (IterStep.skip it₁ ⟨⟩) : IterationT m (RawStep α (SimpleIterator.βInternal α m)))).property (some it₂) ↔
       it₂ = it₁ := by
   simp [Functor.map, Pure.pure, IterStep.successor]
 
-theorem successor_done [Monad m] [Pure m] [SimpleIterator α m β] {it: SimpleIterator.α' α m} :
+theorem successor_done [Monad m] [Pure m] [SimpleIterator α α' m β] {it: α} :
     (IterStep.successor <$>
-      (pure (IterStep.done True.intro : RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)) : IterationT m _)).property (some it) ↔ False := by
+      (pure (IterStep.done True.intro : RawStep α (SimpleIterator.βInternal α m)) : IterationT m _)).property (some it) ↔ False := by
   simp [Functor.map, Pure.pure, IterStep.successor]
 
 -- theorem successor_matchStepH.{w} {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
@@ -148,12 +146,12 @@ theorem successor_done [Monad m] [Pure m] [SimpleIterator α m β] {it: SimpleIt
 --   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
 --   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
 
-theorem successor_matchStep {α β γ δ} {m} [Monad m] [Iterator α m β] {it : Iterator.α' α m} {yield skip done}
+theorem successor_matchStep {α β γ δ} {m} [Monad m] [Iterator α α' m β] {it : α} {yield skip done}
     {f : γ → δ} {x : δ}
-    (h : (f <$> matchStep it yield skip done).property x) :
-    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' (Iterator.βEquiv.inv b)).property x) ∨
-    (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').property x) ∨
-    (Iterator.done it ∧ (f <$> done).property x) := by
+    (h : (f <$> matchStep (m := m) it yield skip done).property x) :
+    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' (Iterator.βEquiv (m := m) |>.inv b)).property x) ∨
+    (∃ it', Iterator.skipped m it it' ∧ (f <$> skip it').property x) ∨
+    (Iterator.done m it ∧ (f <$> done).property x) := by
   simp only [Functor.map, Bind.bind, matchStep] at h
   obtain ⟨c, rfl, _, h, h'⟩ := h
   split at h

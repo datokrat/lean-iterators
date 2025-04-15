@@ -31,5 +31,5 @@ structure Equiv (α β) where
   hom_inv : ∀ {b}, hom (inv b) = b
   inv_hom : ∀ {a}, inv (hom a) = a
 
-def Equiv.id (α) : Equiv α α :=
+def Equiv.id {α} : Equiv α α :=
   { hom := _root_.id, inv := _root_.id, hom_inv := rfl, inv_hom := rfl }

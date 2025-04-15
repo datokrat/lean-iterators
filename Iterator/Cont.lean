@@ -29,6 +29,26 @@ instance [Monad m] : Monad (ContT m α) where
 instance [Monad m] : MonadLift m (ContT m α) where
   monadLift x f := x >>= f
 
+def CodensityT.{u} (m : Type w → Type w') (β : Type u) := ∀ (α), (β → m α) → m α
+
+@[always_inline, inline]
+def CodensityT.run [Pure m] {α : Type w} (x : CodensityT m α) := x _ pure
+
+@[always_inline, inline]
+def CodensityT.mapH {β : Type u} {γ : Type u'} (f : β → γ) (x : CodensityT m β) : CodensityT m γ :=
+  fun _ h => x _ <| h ∘ f
+
+@[always_inline, inline]
+def CodensityT.eval [Bind m] {α : Type w} (x : m α) : CodensityT m α :=
+  fun _ h => x >>= h
+
+instance [Monad m] : Monad (CodensityT m) where
+  pure x _ h := h x
+  bind x f _ h := x _ (f · _ h)
+
+instance [Monad m] : MonadLift m (CodensityT m) where
+  monadLift x _ f := x >>= f
+
 def Cont (α : Type u) (β : Type v) := (β → α) → α
 
 instance : Monad (Cont α) where
