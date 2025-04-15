@@ -10,85 +10,79 @@ section SimpleIterator
 
 abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
 
-universe x y
-
 @[ext]
-structure IterationT (m : Type u → Type v) (γ : Type y) where
+structure IterationT (m : Type u → Type v) (γ : Type u) where
   property : γ → Prop
-  computation : ∀ n : Type y → Type x, [Monad n] → (∀ {γ δ}, m γ → (γ → n δ) → n δ) → n { c : γ // property c }
+  computation : m { c : γ // property c }
 
 instance [Monad m] : Monad (IterationT m) where
   pure a := { property b := (b = a)
-              computation _ _ _ := pure ⟨a, rfl⟩ }
+              computation := pure ⟨a, rfl⟩ }
   bind x f := { property a := ∃ b, (f b).property a ∧ x.property b
-                computation n _ bindH := do
-                  let b ← x.computation n bindH
-                  let a ← (f b).computation n bindH
+                computation := do
+                  let b ← x.computation
+                  let a ← (f b).computation
                   return ⟨a.1, b.1, a.2, b.2⟩ }
 
-@[inline]
-def IterationT.mapH {γ : Type u} {m : Type w → Type w'} [Monad m]
-    {δ : Type u'}
-    (f : γ → δ)
-    (t : IterationT.{max u x} m γ) : IterationT.{x} m δ :=
-  { property d := ∃ c, d = f c ∧ t.property c,
-    computation n _ bindH :=
-      have := t.computation
-        (Cont (n { d : δ // ∃ c, d = f c ∧ t.property c }))
-        (fun {_ _} x f h => bindH x (f · h))
-      (this.bindH (fun a => pure <| pure ⟨f a.1, a.1, rfl, a.2⟩)).run }
+-- @[inline]
+-- def IterationT.mapH {γ : Type w} {m : Type w → Type w'} [Monad m]
+--     {δ : Type w}
+--     (f : γ → δ)
+--     (t : IterationT m γ) : IterationT.{x} m δ :=
+--   { property d := ∃ c, d = f c ∧ t.property c,
+--     computation := (sorry) <$> t.computation }
 
-@[inline]
-def IterationT.bindH {m : Type w → Type w'} [Monad m] {γ : Type u} {δ : Type u'}
-    (t : IterationT.{max u x} m γ) (f : γ → IterationT.{x} m δ) : IterationT.{x} m δ :=
-  { property d := ∃ c, (f c).property d ∧ t.property c
-    computation n _ bindH :=
-      have := t.computation
-        (Cont (n { d : δ // ∃ c, (f c).property d ∧ t.property c }))
-        (fun {_ _} x f h => bindH x (f · h))
-      this (fun c => (fun d => ⟨d.1, c.1, d.2, c.2⟩) <$> (f c).computation n bindH) }
+-- @[inline]
+-- def IterationT.bindH {m : Type w → Type w'} [Monad m] {γ : Type u} {δ : Type u'}
+--     (t : IterationT.{max u x} m γ) (f : γ → IterationT.{x} m δ) : IterationT.{x} m δ :=
+--   { property d := ∃ c, (f c).property d ∧ t.property c
+--     computation n _ bindH :=
+--       have := t.computation
+--         (Cont (n { d : δ // ∃ c, (f c).property d ∧ t.property c }))
+--         (fun {_ _} x f h => bindH x (f · h))
+--       this (fun c => (fun d => ⟨d.1, c.1, d.2, c.2⟩) <$> (f c).computation n bindH) }
 
 @[always_inline, inline]
 def IterationT.step {α : Type u} (m : Type w → Type w') {β : Type v}
-    [Iterator α m β] [SteppableIterator.{x} α m β] [Monad m] (it : α) : IterationT.{x} m (IterStep.for m it) :=
+    [Iterator α m β] [Monad m] (it : Iterator.α' α m) : IterationT m (IterStep.for m it) :=
   { property
-      | .yield it' b _ => Iterator.yielded m it it' b
-      | .skip it' _ => Iterator.skipped m it it'
-      | .done _ => Iterator.finished m it,
-    computation n _ mapH := (fun step => ⟨step, match step with
+      | .yield it' b _ => Iterator.yielded it it' b
+      | .skip it' _ => Iterator.skipped it it'
+      | .done _ => Iterator.done it,
+    computation := (fun step => ⟨step, match step with
         | .yield _ _ h => h
         | .skip _ h => h
-        | .done h => h⟩) <$> SteppableIterator.intoMonad (m := m) n mapH it
-  }
+        | .done h => h⟩) <$> Iterator.step it }
 
 class SimpleIterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  step : α → IterationT.{x} m (RawStep α β)
+  α' : Type w
+  β' : Type w
+  αEquiv : Equiv α α'
+  βEquiv : Equiv β β'
+  step : α' → IterationT m (RawStep α' β')
 
-instance [SimpleIterator.{0} α m β] : Iterator α m β where
+instance [SimpleIterator α m β] [Monad m] : Iterator α m β where
+  α' := SimpleIterator.α' α m
+  β' := SimpleIterator.β' α m
+  αEquiv := SimpleIterator.αEquiv
+  βEquiv := SimpleIterator.βEquiv
   yielded it it' output := SimpleIterator.step (m := m) it |>.property <| .yield it' output ⟨⟩
   skipped it it' := SimpleIterator.step it (m := m) |>.property <| .skip it' ⟨⟩
-  finished it := SimpleIterator.step (m := m) it |>.property <| .done ⟨⟩
-
-class SimpleIterator.CompatibleUniverses (α m) {β} [i₁ : SimpleIterator.{x} α m β] [i₂ : SimpleIterator.{y} α m β] : Prop where
-  compatible : ∀ it, (SimpleIterator.step.{x} (α := α) (m := m) it).property = (SimpleIterator.step.{y} (α := α) (m := m) it).property := by intro; rfl
-
-instance [i₁ : SimpleIterator.{0} α m β] [i₂ : SimpleIterator.{x} α m β] [ic : SimpleIterator.CompatibleUniverses α m (i₁ := i₂) (i₂ := i₁)] :
-    SteppableIterator.{x} α m β where
-  intoMonad n _ mapH it :=
-  (match · with
-    | ⟨.yield it' output _, h⟩ => .yield it' output (by rwa [ic.compatible] at h)
-    | ⟨.skip it' _, h⟩ => .skip it' (by rwa [ic.compatible] at h)
-    | ⟨.done _, h⟩ => .done (by rwa [ic.compatible] at h)) <$> (SimpleIterator.step (m := m) it).computation n mapH
+  done it := SimpleIterator.step (m := m) it |>.property <| .done ⟨⟩
+  step it := (match · with
+    | ⟨.yield it' output _, h⟩ => .yield it' output h
+    | ⟨.skip it' _, h⟩ => .skip it' h
+    | ⟨.done _, h⟩ => .done h) <$> (SimpleIterator.step it).computation
 
 set_option pp.universes true in
-class SimpleIterator.Finite {β : Type v} (α : Type u) (m : Type w → Type w') [SimpleIterator.{0} α m β] [SimpleIterator.{max u v} α m β] [Monad m] where
-  rel : α → α → Prop
+class SimpleIterator.Finite {β : Type v} (α : Type u) (m : Type w → Type w') [SimpleIterator α m β] [Monad m] where
+  rel : Iterator.α' α m → Iterator.α' α m → Prop
   wf : WellFounded rel
-  subrelation : {it it' : α} → ((SimpleIterator.step (m := m) it).mapH (m := m) IterStep.successor).property (some it') → rel it' it
+  subrelation : {it it' : Iterator.α' α m} → (IterStep.successor <$> (SimpleIterator.step (m := m) it)).property (some it') → rel it' it
 
 instance (α m) [SimpleIterator.{0} α m β] [Monad m] [SimpleIterator.Finite α m] : Finite α m where
   wf := by
-    refine Subrelation.wf (r := InvImage (SimpleIterator.Finite.rel (α := α) β m) FiniteIteratorWF.inner) ?_ ?_
+    refine Subrelation.wf (r := InvImage (SimpleIterator.Finite.rel (α := α) (m := m)) FiniteIteratorWF.inner) ?_ ?_
     · intro x y h
       apply SimpleIterator.Finite.subrelation
       obtain ⟨b, h⟩ | h := h
@@ -97,60 +91,72 @@ instance (α m) [SimpleIterator.{0} α m β] [Monad m] [SimpleIterator.Finite α
     · apply InvImage.wf
       exact SimpleIterator.Finite.wf
 
+-- @[inline]
+-- def matchStepH.{w} {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
+--     [Iterator α m β] [SteppableIterator.{max x u v} α m β]
+--     {γ : Type v'}
+--     (it : α)
+--     (yield : α → β → IterationT.{x} m γ) (skip : α → IterationT.{x} m γ) (done : IterationT.{x} m γ) : IterationT.{x} m γ :=
+--   IterationT.step m it |>.bindH (match · with
+--   | .yield it' b _ => yield it' b
+--   | .skip it' _ => skip it'
+--   | .done _ => done)
+
+variable {α : Type u} {m : Type w → Type w'} {β : Type v}
+
 @[inline]
-def matchStepH.{w} {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
-    [Iterator α m β] [SteppableIterator.{max x u v} α m β]
-    {γ : Type v'}
-    (it : α)
-    (yield : α → β → IterationT.{x} m γ) (skip : α → IterationT.{x} m γ) (done : IterationT.{x} m γ) : IterationT.{x} m γ :=
-  IterationT.step m it |>.bindH (match · with
-  | .yield it' b _ => yield it' b
+def matchStep {γ : Type w} [Monad m]
+    [Iterator α m β] (it : Iterator.α' α m) (yield : Iterator.α' α m → β → IterationT m γ)
+    (skip : Iterator.α' α m → IterationT m γ) (done : IterationT m γ) : IterationT m γ := do
+  match ← IterationT.step m it with
+  | .yield it' b _ => yield it' (Iterator.βEquiv.inv b)
   | .skip it' _ => skip it'
-  | .done _ => done)
+  | .done _ => done
 
-@[inline]
-def matchStep {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type v'} [Monad m]
-    [Iterator α m β] [SteppableIterator.{max x u v} α m β] (it : α)
-    (yield : α → β → IterationT.{x} m γ) (skip : α → IterationT.{x} m γ) (done : IterationT.{x} m γ) : IterationT.{x} m γ :=
-  matchStepH it yield skip done
-
-theorem successor_yield {α β m} [Monad m] [Pure m] [Iterator α m β] {it₁ it₂ : α} {b} :
-    (IterationT.mapH (m := m) IterStep.successor (pure (IterStep.yield it₁ b True.intro : RawStep α β))).property (some it₂) ↔
+theorem successor_yield [Monad m] [Pure m] [SimpleIterator α m β] {it₁ it₂ : SimpleIterator.α' α m} {b} :
+    (IterStep.successor <$>
+        (pure (IterStep.yield it₁ b True.intro) : IterationT m (RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)))).property (some it₂) ↔
       it₂ = it₁ := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
+  simp [Functor.map, Pure.pure, IterStep.successor]
 
-theorem successor_skip {α β m} [Monad m] [Pure m] [Iterator α m β] {it₁ it₂ : α} :
-    (IterationT.mapH (m := m) IterStep.successor (pure (IterStep.skip it₁ True.intro : RawStep α β))).property (some it₂) ↔
+theorem successor_skip [Monad m] [Pure m] [SimpleIterator α m β] {it₁ it₂ : SimpleIterator.α' α m} :
+    (IterStep.successor <$>
+        (pure (IterStep.skip it₁ ⟨⟩) : IterationT m (RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)))).property (some it₂) ↔
       it₂ = it₁ := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
+  simp [Functor.map, Pure.pure, IterStep.successor]
 
-theorem successor_done {α β m} [Monad m] [Pure m] [Iterator α m β] {it: α} :
-    (IterationT.mapH (m := m) IterStep.successor (pure (IterStep.done True.intro : RawStep α β))).property (some it) ↔
-      False := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
+theorem successor_done [Monad m] [Pure m] [SimpleIterator α m β] {it: SimpleIterator.α' α m} :
+    (IterStep.successor <$>
+      (pure (IterStep.done True.intro : RawStep (SimpleIterator.α' α m) (SimpleIterator.β' α m)) : IterationT m _)).property (some it) ↔ False := by
+  simp [Functor.map, Pure.pure, IterStep.successor]
 
-theorem successor_matchStepH.{w} {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
-    [Monad m] [Iterator α m β] [SteppableIterator α m β]
-    {it : α} {yield skip done}
+-- theorem successor_matchStepH.{w} {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
+--     [Monad m] [Iterator α m β] [SteppableIterator α m β]
+--     {it : α} {yield skip done}
+--     {f : γ → δ} {x : δ}
+--     (h : (IterationT.mapH f <| matchStepH (m := m) (γ := γ) it yield skip done).property x) :
+--     (∃ it' b, Iterator.yielded m it it' b ∧ (IterationT.mapH f <| yield it' b).property x) ∨
+--     (∃ it', Iterator.skipped m it it' ∧ (IterationT.mapH f <| skip it').property x) ∨
+--     (Iterator.finished m it ∧ (IterationT.mapH f done).property x) := by
+--   simp only [IterationT.mapH, IterationT.bindH, matchStepH] at h
+--   obtain ⟨c, rfl, _, h, h'⟩ := h
+--   split at h
+--   · exact Or.inl ⟨_, _, ‹_›, ⟨c, rfl, h⟩⟩
+--   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
+--   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
+
+theorem successor_matchStep {α β γ δ} {m} [Monad m] [Iterator α m β] {it : Iterator.α' α m} {yield skip done}
     {f : γ → δ} {x : δ}
-    (h : (IterationT.mapH f <| matchStepH (m := m) (γ := γ) it yield skip done).property x) :
-    (∃ it' b, Iterator.yielded m it it' b ∧ (IterationT.mapH f <| yield it' b).property x) ∨
-    (∃ it', Iterator.skipped m it it' ∧ (IterationT.mapH f <| skip it').property x) ∨
-    (Iterator.finished m it ∧ (IterationT.mapH f done).property x) := by
-  simp only [IterationT.mapH, IterationT.bindH, matchStepH] at h
+    (h : (f <$> matchStep it yield skip done).property x) :
+    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' (Iterator.βEquiv.inv b)).property x) ∨
+    (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').property x) ∨
+    (Iterator.done it ∧ (f <$> done).property x) := by
+  simp only [Functor.map, Bind.bind, matchStep] at h
   obtain ⟨c, rfl, _, h, h'⟩ := h
   split at h
   · exact Or.inl ⟨_, _, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inl ⟨_, ‹_›, ⟨c, rfl, h⟩⟩
   · exact Or.inr <| Or.inr ⟨‹_›, ⟨c, rfl, h⟩⟩
-
-theorem successor_matchStep {α β γ δ} {m} [Monad m] [Iterator α m β] [SteppableIterator α m β] {it : α} {yield skip done}
-    {f : γ → δ} {x : δ}
-    (h : (IterationT.mapH f <| matchStep (m := m) (γ := γ) it yield skip done).property x) :
-    (∃ it' b, Iterator.yielded m it it' b ∧ (IterationT.mapH f <| yield it' b).property x) ∨
-    (∃ it', Iterator.skipped m it it' ∧ (IterationT.mapH f <| skip it').property x) ∨
-    (Iterator.finished m it ∧ (IterationT.mapH f done).property x) := by
-  exact successor_matchStepH h
 
 #exit
 

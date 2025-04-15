@@ -16,12 +16,14 @@ structure ListIterator (α : Type u) where
   list : List α
 
 instance {α} [Pure m] : Iterator (ListIterator α) m α where
+  α' := ListIterator α
+  β' := α
+  αEquiv := .id _
+  βEquiv := .id _
   yielded it it' a := it.list = a :: it'.list
   skipped _ _ := False
-  finished it := it.list = []
-
-instance {α} [Pure m] : SteppableIterator (ListIterator α) m α where
-  intoMonad _ _ _
+  done it := it.list = []
+  step
     | { list := .nil } => pure <| .done rfl
     | { list := x :: xs } => pure <| .yield { list := xs } x rfl
 
@@ -33,9 +35,10 @@ The iterator yields the elements of the list in order and then terminates.
 def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id) [Pure m] : Iter (α := ListIterator α) m α :=
   toIter m { list := l }
 
-@[inline]
-def List.iterH {α : Type u} (l : List α) (m := by exact Id.{u}) [Pure m] : Iter (α := ListIterator α) m α :=
-  toIter m { list := l }
+-- TODO
+-- @[inline]
+-- def List.iterH {α : Type u} (l : List α) (m) [Pure m] : Iter (α := ListIterator α) m α :=
+--   toIter m { list := l }
 
 theorem ListIterator.subrelation [Pure m] :
     Subrelation (FiniteIteratorWF.lt (α := ListIterator α) (m := m))
@@ -51,6 +54,7 @@ instance [Pure m] : Finite (ListIterator α) m where
 
 end ListIterator
 
+/-
 section Unfold
 
 universe u v
@@ -85,3 +89,4 @@ instance [Pure m] : Productive (UnfoldIterator α f) m where
     rintro _ ⟨⟩
 
 end Unfold
+-/

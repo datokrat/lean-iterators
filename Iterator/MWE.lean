@@ -2,7 +2,7 @@ import Iterator.Generators
 import Iterator.Combinators.Take
 
 set_option trace.compiler.ir.result true in
-set_option compiler.small 9 in
+set_option compiler.small 2 in
 def test (l : List Nat) : Nat :=
   go (l.iter Id |>.take 5) 0
 where

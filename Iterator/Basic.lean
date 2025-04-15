@@ -9,7 +9,7 @@ import Init.Classical
 import Init.Ext
 import Init.NotationExtra
 import Init.TacticsExtra
-import Iterator.OverT
+import Iterator.UnivLE
 
 /-!
 # Iterators
@@ -113,36 +113,33 @@ inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop
 | skip : (a : α) → skipped a → IterStep α β yielded skipped finished
 | done : finished → IterStep α β yielded skipped finished
 
-set_option pp.all true in
 def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .yield it _ _ => some it
   | .skip it _ => some it
   | .done _ => none
 
 class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  yielded : α → α → β → Prop
-  skipped : α → α → Prop
-  finished : α → Prop
+  α' : Type w
+  β' : Type w
+  αEquiv : Equiv α α'
+  βEquiv : Equiv β β'
+  yielded : α' → α' → β' → Prop
+  skipped : α' → α' → Prop
+  done : α' → Prop
+  step : (it : α') → m (IterStep α' β' (yielded it) (skipped it) (done it))
 
-abbrev IterStep.for {α β} (m) [Iterator α m β] (it : α) :=
-  IterStep α β (Iterator.yielded m it) (Iterator.skipped m it) (Iterator.finished m it)
-
-class SteppableIterator (α : Type u) (m : Type w → Type w') (β : (outParam (Type v))) [Iterator α m β] where
-  intoMonad : ∀ n : Type max u v → Type x, [Monad n] →
-    (bindH : ∀ {γ δ}, m γ → (γ → n δ) → n δ) → (it : α) → n (IterStep.for m it)
-
-def USwitchT (m : Type w → Type w') (α : Type u) :=
-  ∀ n : Type u → Type x, [Monad n] → (bindH : ∀ {γ δ}, m γ → (γ → n δ) → n δ) → n α
+abbrev IterStep.for {α β} (m) [Iterator α m β] (it : Iterator.α' α m) :=
+  IterStep (Iterator.α' α m) (Iterator.β' α m) (Iterator.yielded it) (Iterator.skipped it) (Iterator.done it)
 
 section Finite
 
 structure FiniteIteratorWF (α m) [Iterator α m β] where
-  inner : α
+  inner : Iterator.α' α m
 
 def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α m) : Prop :=
-  (∃ b, Iterator.yielded m y.inner x.inner b) ∨ Iterator.skipped m y.inner x.inner
+  (∃ b, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped y.inner x.inner
 
-def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α m :=
+def finiteIteratorWF {α m β} [Iterator α m β] (it : Iterator.α' α m) : FiniteIteratorWF α m :=
   ⟨it⟩
 
 class Finite (α m) [Iterator α m β] : Prop where
@@ -159,12 +156,12 @@ end Finite
 section Productive
 
 structure ProductiveIteratorWF (α m) [Iterator α m β] where
-  inner : α
+  inner : Iterator.α' α m
 
 def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α m) : Prop :=
-  Iterator.skipped m y.inner x.inner
+  Iterator.skipped y.inner x.inner
 
-def productiveIteratorWF {α m β} [Iterator α m β] (it : α) : ProductiveIteratorWF α m :=
+def productiveIteratorWF {α m β} [Iterator α m β] (it : Iterator.α' α m) : ProductiveIteratorWF α m :=
   ⟨it⟩
 
 class Productive (α m) [Iterator α m β] : Prop where

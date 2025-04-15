@@ -12,34 +12,29 @@ This file provides the iterator combinator `Iter.take`.
 
 variable {α : Type u} {m : Type w → Type w'} {β : Type v}
 
+@[ext]
 structure Take (α : Type u) where
   remaining : Nat
   inner : α
 
-set_option pp.universes true
-
-instance [Monad m] [Iterator α m β] [SteppableIterator α m β] : SimpleIterator (Take α) m β where
+instance [Monad m] [Iterator α m β] : SimpleIterator (Take α) m β where
+  α' := Take (Iterator.α' α m)
+  β' := Iterator.β' α m
+  αEquiv := {
+    hom it := { inner := Iterator.αEquiv.hom it.inner, remaining := it.remaining }
+    inv it := { inner := Iterator.αEquiv.inv it.inner, remaining := it.remaining }
+    hom_inv := by simp [Equiv.hom_inv]
+    inv_hom := by simp [Equiv.inv_hom]
+  }
+  βEquiv := Iterator.βEquiv
   step it :=
     match it with
     | { remaining := 0, inner := _ } => pure <| .done ⟨⟩
     | { remaining := remaining' + 1, inner := it } =>
       matchStep (m := m) it
-        (fun it' b => pure <| .yield ⟨remaining', it'⟩ b ⟨⟩)
+        (fun it' b => pure <| .yield ⟨remaining', it'⟩ (Iterator.βEquiv.hom b) ⟨⟩)
         (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩ ⟨⟩)
         (pure <| .done ⟨⟩)
-
-instance [Monad m] [Iterator α m β] [SteppableIterator α m β] [SteppableIterator α m β] :
-    SimpleIterator.CompatibleUniverses.{x, y} (Take α) m where
-  compatible it := by
-    simp [SimpleIterator.step]
-    split
-    · rfl
-    · simp only [matchStep, matchStepH, IterationT.bindH]
-      ext
-      rw [iff_iff_eq]
-      congr
-      ext
-      split <;> rfl
 
 /--
 Given an iterator `it` and a natural number `n`, `it.take n` is an iterator that outputs
@@ -67,23 +62,24 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 @[inline]
-def Iter.take [Iterator α m β] [SteppableIterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
-  toIter m <| Take.mk n it.inner
+def Iter.take [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
+  toIter (α := Take α) m <| Take.mk n it.inner
 
-def Take.rel (m : Type w → Type w') [Iterator α m β] : Take α → Take α → Prop :=
+def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] :
+    Iterator.α' (Take α) m → Iterator.α' (Take α) m → Prop :=
   InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt)
-    (fun it => (it.remaining, productiveIteratorWF (m := m) it.inner))
+    (fun it => (it.remaining, productiveIteratorWF (α := α) (m := m) it.inner))
 
-theorem Take.rel_of_remaining [Iterator α m β] {it it' : Take α}
+theorem Take.rel_of_remaining [Monad m] [Iterator α m β] {it it' : Iterator.α' (Take α) m}
     (h : it'.remaining < it.remaining) : Take.rel m it' it :=
   Prod.Lex.left _ _ h
 
-theorem Take.rel_of_inner [Iterator α m β] {remaining : Nat} {it it' : α}
+theorem Take.rel_of_inner [Monad m] [Iterator α m β] {remaining : Nat} {it it' : Iterator.α' α m}
     (h : (productiveIteratorWF (m := m) it').lt (productiveIteratorWF it)) :
     Take.rel m ⟨remaining, it'⟩ ⟨remaining, it⟩ :=
   Prod.Lex.right _ h
 
-instance [Monad m] [Iterator α m β] [SteppableIterator α m β] [Productive α m] : SimpleIterator.Finite (Take α) m where
+instance [Monad m] [Iterator α m β] [Productive α m] : SimpleIterator.Finite (Take α) m where
   rel := Take.rel m
   wf := by
     apply InvImage.wf
@@ -94,7 +90,7 @@ instance [Monad m] [Iterator α m β] [SteppableIterator α m β] [Productive α
     cases it
     simp only [SimpleIterator.step] at h
     split at h
-    · cases successor_done.mp h
+    · cases successor_done |>.mp h
     · rename_i heq
       cases heq
       obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h

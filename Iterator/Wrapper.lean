@@ -8,16 +8,19 @@ import Iterator.Basic
 import Iterator.Cont
 
 structure Iter {α} (m β) [Iterator α m β] where
-  inner : α
+  inner : Iterator.α' α m
 
 def Iter.Relations.yielded {α m β} [Iterator α m β] (it it' : Iter (α := α) m β) (output : β) : Prop :=
-  Iterator.yielded m it.inner it'.inner output
+  Iterator.yielded it.inner it'.inner (Iterator.βEquiv.hom output)
 
 def Iter.Relations.skipped {α m β} [Iterator α m β] (it it' : Iter (α := α) m β) : Prop :=
-  Iterator.skipped m it.inner it'.inner
+  Iterator.skipped it.inner it'.inner
 
 def Iter.Relations.done {α m β} [Iterator α m β] (it : Iter (α := α) m β) : Prop :=
-  Iterator.finished m it.inner
+  Iterator.done it.inner
+
+structure Iter.EncodedStep {α m β} [Iterator α m β] (it : Iter (α := α) m β) where
+  inner : IterStep.for m it.inner
 
 inductive Iter.Step {α m β} [Iterator α m β] (it : Iter (α := α) m β) where
   | yield : (it' : Iter (α := α) m β) → (output : β) → Iter.Relations.yielded it it' output → it.Step
@@ -25,13 +28,18 @@ inductive Iter.Step {α m β} [Iterator α m β] (it : Iter (α := α) m β) whe
   | done : Iter.Relations.done it → it.Step
 
 @[always_inline, inline]
-def Iter.Step.ofInternal {α m β} [Iterator α m β] {it : Iter (α := α) m β} : IterStep.for m it.inner → it.Step
-  | .yield it' output h => .yield ⟨it'⟩ output h
+def Iter.EncodedStep.decode {α m β} [Iterator α m β] {it : Iter (α := α) m β} (step : it.EncodedStep) : it.Step :=
+  match step.inner with
+  | .yield it' out h => .yield ⟨it'⟩ (Iterator.βEquiv.inv out) (by simp [Relations.yielded, Equiv.hom_inv, h])
   | .skip it' h => .skip ⟨it'⟩ h
   | .done h => .done h
 
-@[inline]
-def toIter (m) (it : α) [Iterator α m β] : Iter (α := α) m β :=
+@[always_inline, inline]
+def Iter.EncodedStep.ofInternal {α m β} [Iterator α m β] {it : Iter (α := α) m β} (step : IterStep.for m it.inner) : it.EncodedStep :=
+  ⟨step⟩
+
+@[always_inline, inline]
+def toIter (m) [Iterator α m β] (it : Iterator.α' α m) : Iter (α := α) m β :=
   ⟨it⟩
 
 -- instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m β where
@@ -50,17 +58,21 @@ def toIter (m) (it : α) [Iterator α m β] : Iter (α := α) m β :=
 -- instance [Functor m] [Iterator α m β] [Productive α m] : Productive (Iter (α := α) m β) m where
 --   wf := InvImage.wf (productiveIteratorWF ∘ Iter.inner ∘ ProductiveIteratorWF.inner) Productive.wf
 
-@[inline]
-def Iter.step {α β : Type u} (m : Type u → Type w) [Monad m]
-    [Iterator α m β] [SteppableIterator.{w} α m β] (it : Iter (α := α) m β) :
-    m (Iter.Step it) :=
-  Iter.Step.ofInternal <$> SteppableIterator.intoMonad m Bind.bind it.inner
-
-@[inline]
+@[always_inline, inline]
 def Iter.stepH {α : Type u} {m : Type w → Type w'} {β : Type v} [Monad m]
-    [Iterator α m β] [SteppableIterator.{max u v w'} α m β] (it : Iter (α := α) m β) {γ} : ContT m γ (Iter.Step it) :=
-  Iter.Step.ofInternal <$> SteppableIterator.intoMonad (ContT m γ) (fun x f h => x >>= (f · h)) it.inner
+    [Iterator α m β] (it : Iter (α := α) m β) : m it.EncodedStep :=
+  Iter.EncodedStep.ofInternal <$> Iterator.step it.inner
 
-@[inline]
+@[always_inline, inline]
+def Iter.stepCont {α : Type u} {m : Type w → Type w'} {β : Type v} [Monad m]
+    [Iterator α m β] (it : Iter (α := α) m β) {γ} : ContT m γ it.Step :=
+  fun h => it.stepH >>= (h ·.decode)
+
+@[always_inline, inline]
+def Iter.step {α β : Type u} (m : Type u → Type w) [Monad m]
+    [Iterator α m β] (it : Iter (α := α) m β) : m (Iter.Step it) :=
+  Iter.EncodedStep.decode <$> it.stepH
+
+@[always_inline, inline]
 def Iter.terminationByFinite {α β m} [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : FiniteIteratorWF α m :=
   finiteIteratorWF it.inner
