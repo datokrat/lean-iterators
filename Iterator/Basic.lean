@@ -116,33 +116,37 @@ def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .skip it _ => some it
   | .done _ => none
 
-class Iterator (α : Type w) (αInternal : outParam (Type u)) (m : Type w → Type w') (β : outParam (Type v)) where
+class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
+  αInternal : Type w
   βInternal : Type w
   αEquiv : Equiv α αInternal
   βEquiv : Equiv β βInternal
-  yielded : α → α → βInternal → Prop
-  skipped : α → α → Prop
-  done : α → Prop
-  step : (it : α) → m (IterStep α βInternal (yielded it) (skipped it) (done it))
+  yielded : αInternal → αInternal → βInternal → Prop
+  skipped : αInternal → αInternal → Prop
+  done : αInternal → Prop
+  step : (it : αInternal) → m (IterStep αInternal βInternal (yielded it) (skipped it) (done it))
 
-abbrev IterStep.for {α α' β} (m) [Iterator α α' m β] (it : α) :=
-  IterStep α (Iterator.βInternal α m) (Iterator.yielded it) (Iterator.skipped m it) (Iterator.done m it)
+def IterState (α : Type u) (m : Type w → Type w') {β : Type v} [Iterator α m β] : Type w :=
+  Iterator.αInternal α m
+
+abbrev IterStep.for {α β} (m) [Iterator α m β] (it : IterState α m) :=
+  IterStep (IterState α m) (Iterator.βInternal α m) (Iterator.yielded it) (Iterator.skipped it) (Iterator.done it)
 
 section Finite
 
-structure FiniteIteratorWF (α m) {α'} [Iterator α α' m β] where
-  inner : α
+structure FiniteIteratorWF (α m) [Iterator α m β] where
+  inner : IterState α m
 
-def FiniteIteratorWF.lt {α α' m β} [Iterator α α' m β] (x y : FiniteIteratorWF α m) : Prop :=
-  (∃ b : Iterator.βInternal α m, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped m y.inner x.inner
+def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α m) : Prop :=
+  (∃ b : Iterator.βInternal α m, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped y.inner x.inner
 
-def finiteIteratorWF {α α' m β} [Iterator α α' m β] (it : α) : FiniteIteratorWF α m :=
+def finiteIteratorWF {α m β} [Iterator α m β] (it : IterState α m) : FiniteIteratorWF α m :=
   ⟨it⟩
 
-class Finite (α m) {α'} [Iterator α α' m β] : Prop where
+class Finite (α m) [Iterator α m β] : Prop where
   wf : WellFounded (FiniteIteratorWF.lt (α := α) (m := m))
 
-instance [Iterator α α' m β] [Finite α m] : WellFoundedRelation (FiniteIteratorWF α m) where
+instance [Iterator α m β] [Finite α m] : WellFoundedRelation (FiniteIteratorWF α m) where
   rel := FiniteIteratorWF.lt
   wf := Finite.wf
 
@@ -152,30 +156,30 @@ end Finite
 
 section Productive
 
-structure ProductiveIteratorWF (α m) {α'} [Iterator α α' m β] where
-  inner : α
+structure ProductiveIteratorWF (α m) [Iterator α m β] where
+  inner : IterState α m
 
-def ProductiveIteratorWF.lt {α α' m β} [Iterator α α' m β] (x y : ProductiveIteratorWF α m) : Prop :=
-  Iterator.skipped m y.inner x.inner
+def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α m) : Prop :=
+  Iterator.skipped y.inner x.inner
 
-def productiveIteratorWF {α α' m β} [Iterator α α' m β] (it : α) : ProductiveIteratorWF α m :=
+def productiveIteratorWF {α m β} [Iterator α m β] (it : IterState α m) : ProductiveIteratorWF α m :=
   ⟨it⟩
 
-class Productive (α m) {α'} [Iterator α α' m β] : Prop where
+class Productive (α m) [Iterator α m β] : Prop where
   wf : WellFounded (ProductiveIteratorWF.lt (α := α) (m := m))
 
-instance {α' m} [Iterator α α' m β] [Productive α m] : WellFoundedRelation (ProductiveIteratorWF α m) where
+instance {m} [Iterator α m β] [Productive α m] : WellFoundedRelation (ProductiveIteratorWF α m) where
   rel := ProductiveIteratorWF.lt
   wf := Productive.wf
 
-theorem ProductiveIteratorWF.subrelation_finiteIteratorWF {α α' m β} [Iterator α α' m β] :
+theorem ProductiveIteratorWF.subrelation_finiteIteratorWF {α m β} [Iterator α m β] :
     Subrelation (α := ProductiveIteratorWF α m)
       ProductiveIteratorWF.lt
       (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ inner)) := by
   intro x y
   exact Or.inr
 
-instance {α' m} [Iterator α α' m β] [Finite α m] : Productive α m where
+instance {m} [Iterator α m β] [Finite α m] : Productive α m where
   wf := ProductiveIteratorWF.subrelation_finiteIteratorWF.wf (InvImage.wf _ Finite.wf)
 
 end Productive

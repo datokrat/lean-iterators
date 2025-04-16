@@ -15,7 +15,8 @@ variable {m : Type w → Type w'}
 structure ListIterator (α : Type u) where
   list : List α
 
-instance {α} [Pure m] : Iterator (ListIterator α) (ListIterator α) m α where
+instance {α} [Pure m] : Iterator (ListIterator α) m α where
+  αInternal := ListIterator α
   βInternal := α
   αEquiv := .id
   βEquiv := .id
