@@ -97,7 +97,7 @@ variable (m f) in
 def flatMapStepSome [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : IterState α m) (it₂ : IterState α₂ m) :
     IterationT m (RawStep (MonomorphicState α α₂ m) (Iterator.βInternal (α := α₂) (m := m))) :=
   matchStep it₂
-    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ (Iterator.βEquiv.hom b) ⟨⟩)
+    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ (Iterator.βEquiv it₂ |>.hom b) ⟨⟩)
     (fun it₂' => pure <| .skip ⟨it₁, some it₂'⟩ ⟨⟩)
     (flatMapStepNone m f it₁)
 
@@ -115,7 +115,7 @@ instance [Monad m] [Iterator α m β] [Iterator α₂ m γ] : SimpleIterator (Fl
       ext
       · exact Iterator.αEquiv.inv_hom
       · simp [Option.map_map, Function.comp_def, Iterator.αEquiv.inv_hom]
-  βEquiv := Iterator.βEquiv
+  βEquiv it := Iterator.βEquiv
   step it := match it with
     | ⟨it₁, none⟩ => flatMapStepNone m f it₁
     | ⟨it₁, some it₂⟩ => flatMapStepSome m f it₁ it₂
@@ -124,151 +124,152 @@ end FlattenDef
 
 section Finite
 
-variable {α : Type u} {β : Type v} {β' : Type w} {α₂ : Type u}
+variable {α : Type u} {β : Type v} {β' : Type w} {α₂ : Type u₂}
     {γ : Type x} {γ' : Type w} {m : Type w → Type w'} {f : β → α₂}
 
-def FlatMap.lex (r₁ : α → α → Prop) (r₂ : α₂ → α₂ → Prop) : FlatMap α f → FlatMap α f → Prop :=
-  InvImage (Prod.Lex r₁ (Option.lt r₂)) (fun it => (it.it₁, it.it₂))
+variable (α m f) in
+def rel [Monad m] [Iterator α m β] [Iterator α₂ m γ] : IterState (FlatMap α f) m → IterState (FlatMap α f) m → Prop :=
+  Prod.Lex
+    (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
+    (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m))))
 
-theorem FlatMap.lex_of_left {r₁ : α → α → Prop} {r₂ : α₂ → α₂ → Prop} {it it'}
-    (h : r₁ it'.it₁ it.it₁) : FlatMap.lex (f := f) r₁ r₂ it' it :=
+theorem FlatMap.rel_of_left [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it it'}
+    (h : (finiteIteratorWF it'.1).lt (finiteIteratorWF it.1)) : rel α m f it' it :=
   Prod.Lex.left _ _ h
 
-theorem FlatMap.lex_of_right {r₁ : α → α → Prop} {r₂ : α₂ → α₂ → Prop} {it₁ it₂ it₂'}
-    (h : r₂ it₂' it₂) : FlatMap.lex (f := f) r₁ r₂ ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
+theorem FlatMap.rel_of_right [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ it₂ it₂'}
+    (h : (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))) it₂' it₂) : rel α m f ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
   Prod.Lex.right _ h
 
--- variable (m f) in
--- def rel [Iterator α m β] [Iterator α₂ m γ] : FlatMap α f → FlatMap α f → Prop :=
---   FlatMap.lex
---     (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
---     (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
+theorem descending_flattenStepNone
+    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : IterState α m} {it' : IterState (FlatMap α f) m}
+    (h : (IterStep.successor <$> flatMapStepNone m f it₁).property (some it')) :
+    (finiteIteratorWF (m := m) it'.1).lt (finiteIteratorWF it₁) := by
+  simp only [flatMapStepNone] at h
+  have := successor_matchStep h
+  obtain ⟨it'', b, hy, h⟩ | ⟨it'', hs, h⟩ | ⟨hd, h⟩ := this
+  -- TODO: We might get rid of these type hints by making the relation etc. work on α, not IterState α m.
+  · cases successor_skip (α := FlatMap α f) (m := m) |>.mp h
+    exact Or.inl ⟨_, hy⟩
+  · cases successor_skip (α := FlatMap α f) (m := m) |>.mp h
+    exact Or.inr hs
+  · cases successor_done (α := FlatMap α f) (m := m) |>.mp h
 
--- theorem descending_flattenStepNone
---     [Monad m] [Iterator α α' m β] [Iterator α₂ α₂' m γ] {it₁ : α} {it' : FlatMap α f}
---     (h : (IterStep.successor <$> flatMapStepNone m it₁).property (some it')) :
---     (finiteIteratorWF (m := m) it'.it₁).lt (finiteIteratorWF it₁) := by
---   simp only [flatMapStepNone] at h
---   have := successor_matchStep h
---   obtain ⟨it'', b, hy, h⟩ | ⟨it'', hs, h⟩ | ⟨hd, h⟩ := this
---   · cases successor_skip.mp h
---     exact Or.inl ⟨_, hy⟩
---   · cases successor_skip.mp h
---     exact Or.inr hs
---   · cases successor_done.mp h
+theorem descending_flattenStepSome
+    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : IterState α m} {it₂ : IterState α₂ m} {it' : IterState (FlatMap α f) m}
+    (h : (IterStep.successor <$> flatMapStepSome m f it₁ it₂).property (some it')) :
+    rel α m f it' ⟨it₁, it₂⟩ := by
+  simp only [flatMapStepSome] at h
+  obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
+  · cases successor_yield (α := FlatMap α f) (m := m) |>.mp h
+    apply FlatMap.rel_of_right
+    exact Or.inl ⟨_, hy⟩
+  · cases successor_skip (α := FlatMap α f) (m := m) |>.mp h
+    apply FlatMap.rel_of_right
+    exact Or.inr hs
+  · apply FlatMap.rel_of_left
+    exact descending_flattenStepNone h
 
--- theorem descending_flattenStepSome
---     [Monad m] [Iterator α α' m β] [Iterator α₂ α₂' m γ] {it₁ : α} {it₂ : α₂} {it' : FlatMap α f}
---     (h : (IterStep.successor <$> flatMapStepSome m it₁ it₂).property (some it')) :
---     rel m f it' { it₁ := it₁, it₂ := some it₂ } := by
---   simp only [flatMapStepSome] at h
---   obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
---   · cases successor_yield.mp h
---     apply FlatMap.lex_of_right
---     exact Or.inl ⟨_, hy⟩
---   · cases successor_skip.mp h
---     apply FlatMap.lex_of_right
---     exact Or.inr hs
---   · apply FlatMap.lex_of_left
---     exact descending_flattenStepNone h
-
--- -- TODO: put this into core
--- theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
---   refine ⟨?_⟩
---   intro x
---   have hn : Acc (Option.lt rel) none := by
---     refine Acc.intro none ?_
---     intro y hyx
---     cases y <;> cases hyx
---   cases x
---   · exact hn
---   · rename_i x
---     induction h.apply x
---     rename_i x' h ih
---     refine Acc.intro _ ?_
---     intro y hyx'
---     cases y
---     · exact hn
---     · exact ih _ hyx'
+-- TODO: put this into core
+theorem Option.wellFounded_lt {α} {rel : α → α → Prop} (h : WellFounded rel) : WellFounded (Option.lt rel) := by
+  refine ⟨?_⟩
+  intro x
+  have hn : Acc (Option.lt rel) none := by
+    refine Acc.intro none ?_
+    intro y hyx
+    cases y <;> cases hyx
+  cases x
+  · exact hn
+  · rename_i x
+    induction h.apply x
+    rename_i x' h ih
+    refine Acc.intro _ ?_
+    intro y hyx'
+    cases y
+    · exact hn
+    · exact ih _ hyx'
 
 instance [Monad m] [Iterator α m β] [Iterator α₂ m γ] [Finite α m] [Finite α₂ m] :
-    SimpleIterator.Finite (FlatMap α f) m := sorry -- where
-  -- rel := rel m f
-  -- wf := by
-  --   simp only [rel, FlatMap.lex]
-  --   apply InvImage.wf
-  --   refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
-  --   · exact InvImage.wf _ Finite.wf
-  --   · exact Option.wellFounded_lt <| InvImage.wf _ Finite.wf
-  -- subrelation {it it'} h := by
-  --   simp only [SimpleIterator.step] at h
-  --   split at h
-  --   · apply FlatMap.lex_of_left
-  --     exact descending_flattenStepNone h
-  --   · exact descending_flattenStepSome h
+    SimpleIterator.Finite (FlatMap α f) m where
+  rel := rel α m f
+  wf := by
+    refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
+    · exact InvImage.wf _ Finite.wf
+    · exact Option.wellFounded_lt <| InvImage.wf _ Finite.wf
+  subrelation {it it'} h := by
+    simp only [SimpleIterator.step] at h
+    split at h
+    · apply FlatMap.rel_of_left
+      exact descending_flattenStepNone h
+    · exact descending_flattenStepSome h
 
 end Finite
 
--- section Dependent
+section Dependent
 
--- variable {m : Type w → Type w'}
---   {β : Type w} {α : β → Type w} {α' : β → Type u'} {γ : Type v}
+variable {m : Type w → Type w'}
+  {β : Type w} {α : β → Type u} {γ : Type v}
 
--- structure SigmaIterator {β : Type v} (α : β → Type w) where
---   b : β
---   inner : α b
+structure SigmaIterator {β : Type v} (α : β → Type u) where
+  b : β
+  inner : α b
 
--- def SigmaIterator.lex (r : (b : β) → α b → α b → Prop) :
---     SigmaIterator α → SigmaIterator α → Prop :=
---   InvImage (PSigma.Lex emptyRelation r) (fun it => ⟨it.b, it.inner⟩)
+instance {β : Type w} {α : β → Type u} {α' : β → Type u'}
+    [Monad m] [∀ b, Iterator (α b) m γ] :
+    SimpleIterator (SigmaIterator α) m γ where
+  αInternal := SigmaIterator (fun b => IterState (α b) m)
+  βInternal := (b : β) × Iterator.βInternal (α := α b) (m := m)
+  αEquiv := {
+      hom it := { b := it.b, inner := Iterator.αEquiv.hom it.inner },
+      inv it := { b := it.b, inner := Iterator.αEquiv.inv it.inner },
+      hom_inv := sorry
+      inv_hom := sorry }
+  βEquiv :=
+  step it := by
+    exact matchStep it.inner
+      (fun it' c => pure <| .yield ⟨it.b, it'⟩ ⟨it.b, Iterator.βEquiv.hom c⟩ ⟨⟩)
+      (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
+      (pure <| .done ⟨⟩)
 
--- theorem SigmaIterator.lex_of_right (r : (b : β) → α b → α b → Prop)
---     {b it it'} (h : r b it it') : SigmaIterator.lex r ⟨b, it⟩ ⟨b, it'⟩ :=
---   PSigma.Lex.right _ h
+def SigmaIterator.lex (r : (b : β) → α b → α b → Prop) :
+    SigmaIterator α → SigmaIterator α → Prop :=
+  InvImage (PSigma.Lex emptyRelation r) (fun it => ⟨it.b, it.inner⟩)
 
--- variable (m) in
--- def SigmaIterator.rel [∀ b, Iterator (α b) (α' b) m γ] :
---     SigmaIterator α → SigmaIterator α → Prop :=
---   SigmaIterator.lex (fun _ => InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
+theorem SigmaIterator.lex_of_right (r : (b : β) → α b → α b → Prop)
+    {b it it'} (h : r b it it') : SigmaIterator.lex r ⟨b, it⟩ ⟨b, it'⟩ :=
+  PSigma.Lex.right _ h
 
--- instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
---     [Monad m] [∀ b, Iterator (α b) (α' b) m γ] :
---     SimpleIterator (SigmaIterator α) (SigmaIterator α') m γ where
---   βInternal := (b : β) × Iterator.βInternal (α := α b) (m := m)
---   αEquiv := sorry
---   βEquiv := sorry
---   step it := by
---     exact matchStep it.inner
---       (fun it' c => pure <| .yield ⟨it.b, it'⟩ ⟨it.b, Iterator.βEquiv.hom c⟩ ⟨⟩)
---       (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
---       (pure <| .done ⟨⟩)
+variable (m) in
+def SigmaIterator.rel [∀ b, Iterator (α b) m γ] :
+    SigmaIterator α → SigmaIterator α → Prop :=
+  SigmaIterator.lex (fun _ => InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
 
--- instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
---     [Monad m] [∀ b, Iterator (α b) (α' b) m γ] [∀ b, Finite (α b) m] : SimpleIterator.Finite (SigmaIterator α) m where
---   rel := SigmaIterator.rel m
---   wf := by
---     rw [SigmaIterator.rel]
---     apply InvImage.wf
---     refine ⟨fun ⟨b, it⟩ => ?_⟩
---     apply PSigma.lexAccessible
---     · exact emptyWf.wf.apply b
---     · intro a
---       apply InvImage.wf
---       exact Finite.wf
---   subrelation {it it'} h := by
---     obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
---     · cases successor_yield.mp h
---       apply SigmaIterator.lex_of_right
---       exact Or.inl ⟨_, hy⟩
---     · cases successor_skip.mp h
---       apply SigmaIterator.lex_of_right
---       exact Or.inr hs
---     · cases successor_done.mp h
+instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
+    [Monad m] [∀ b, Iterator (α b) (α' b) m γ] [∀ b, Finite (α b) m] : SimpleIterator.Finite (SigmaIterator α) m where
+  rel := SigmaIterator.rel m
+  wf := by
+    rw [SigmaIterator.rel]
+    apply InvImage.wf
+    refine ⟨fun ⟨b, it⟩ => ?_⟩
+    apply PSigma.lexAccessible
+    · exact emptyWf.wf.apply b
+    · intro a
+      apply InvImage.wf
+      exact Finite.wf
+  subrelation {it it'} h := by
+    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
+    · cases successor_yield.mp h
+      apply SigmaIterator.lex_of_right
+      exact Or.inl ⟨_, hy⟩
+    · cases successor_skip.mp h
+      apply SigmaIterator.lex_of_right
+      exact Or.inr hs
+    · cases successor_done.mp h
 
--- variable {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
---   {α' : β → Type u'} {β' : Type v'} {f : (b : β) → α' b}
+variable {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
+  {α' : β → Type u'} {β' : Type v'} {f : (b : β) → α' b}
 
--- end Dependent
+end Dependent
 
 section Iter
 /--

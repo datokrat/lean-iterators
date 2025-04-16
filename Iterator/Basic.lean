@@ -120,7 +120,7 @@ class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) w
   αInternal : Type w
   βInternal : Type w
   αEquiv : Equiv α αInternal
-  βEquiv : Equiv β βInternal
+  βEquiv : αInternal → Equiv β βInternal
   yielded : αInternal → αInternal → βInternal → Prop
   skipped : αInternal → αInternal → Prop
   done : αInternal → Prop

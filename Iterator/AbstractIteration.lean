@@ -63,7 +63,7 @@ class SimpleIterator (α : Type u) (m : Type w → Type w') (β : outParam (Type
   αInternal : Type w
   βInternal : Type w
   αEquiv : Equiv α αInternal
-  βEquiv : Equiv β βInternal
+  βEquiv : αInternal → Equiv β βInternal
   step : αInternal → IterationT m (RawStep αInternal βInternal)
 
 instance [SimpleIterator α m β] [Monad m] : Iterator α m β where
@@ -112,7 +112,7 @@ def matchStep {γ : Type w} [Monad m]
     [Iterator α m β] (it : IterState α m) (yield : IterState α m → β → IterationT m γ)
     (skip : IterState α m → IterationT m γ) (done : IterationT m γ) : IterationT m γ := do
   match ← IterationT.step m it with
-  | .yield it' b _ => yield it' (Iterator.βEquiv.inv b)
+  | .yield it' b _ => yield it' (Iterator.βEquiv it |>.inv b)
   | .skip it' _ => skip it'
   | .done _ => done
 
@@ -151,7 +151,7 @@ theorem successor_done [Monad m] [Pure m] [SimpleIterator α m β] {it: IterStat
 theorem successor_matchStep {α β γ δ} {m} [Monad m] [Iterator α m β] {it : IterState α m} {yield skip done}
     {f : γ → δ} {x : δ}
     (h : (f <$> matchStep (m := m) it yield skip done).property x) :
-    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' (Iterator.βEquiv (m := m) |>.inv b)).property x) ∨
+    (∃ it' b, Iterator.yielded it it' b ∧ (f <$> yield it' (Iterator.βEquiv it |>.inv b)).property x) ∨
     (∃ it', Iterator.skipped it it' ∧ (f <$> skip it').property x) ∨
     (Iterator.done it ∧ (f <$> done).property x) := by
   simp only [Functor.map, Bind.bind, matchStep] at h

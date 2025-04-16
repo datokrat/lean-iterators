@@ -25,15 +25,15 @@ section FilterMapMH
 universe u' v' u v
 
 @[ext]
-structure FilterMapMH (α : Type u) {β : Type v} (γ : Type v') {γ' : Type w} (γEquiv : Equiv γ γ')
-    {m : Type w → Type w'} (f : β → m (Option γ')) where
+structure FilterMapMH (α : Type u) {α' : Type u'} {β : Type v} (γ : Type v') {γ' : Type w} (γEquiv : α' → Equiv γ γ')
+    {m : Type w → Type w'} (f : α' → β → m (Option γ')) where
   inner : α
 
 variable {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type v'} {γ' : Type w}
     [Monad m] [Iterator α m β]
-    {γEquiv : Equiv γ γ'} {f : β → m (Option γ')}
+    {γEquiv : IterState α m → Equiv γ γ'} {f : IterState α m → β → m (Option γ')}
 
-instance [Iterator α m β] : SimpleIterator (FilterMapMH α γ γEquiv f) m γ where
+instance : SimpleIterator (FilterMapMH α γ γEquiv f) m γ where
   αInternal := FilterMapMH (IterState α m) γ γEquiv f
   βInternal := γ'
   αEquiv := by
@@ -44,14 +44,14 @@ instance [Iterator α m β] : SimpleIterator (FilterMapMH α γ γEquiv f) m γ 
     · intro
       ext
       exact Iterator.αEquiv.inv_hom
-  βEquiv := γEquiv
+  βEquiv := γEquiv ∘ FilterMapMH.inner
   step it :=
     matchStep it.inner
       (fun it' b =>
         (match · with
           | none => .skip ⟨it'⟩ ⟨⟩
           | some c => .yield ⟨it'⟩ c ⟨⟩)
-        <$> (monadLift (f b)))
+        <$> (monadLift (f it.inner b)))
       (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
 
@@ -73,9 +73,9 @@ instance [Finite α m] : SimpleIterator.Finite (FilterMapMH α γ γEquiv f) m w
     · cases successor_done.mp h
 
 @[inline]
-def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → CodensityT m (Option γ)) (γEquiv : Equiv γ γ') (it : IterState α m) :
+def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → CodensityT m (Option γ)) (γEquiv : IterState α m → Equiv γ γ') (it : IterState α m) :
     --FilterMapMH (IterState α m) γ γEquiv (fun b => f b _ (pure <| ·.map γEquiv.hom)) :=
-    IterState (FilterMapMH α γ γEquiv (fun b => f b _ (pure <| ·.map γEquiv.hom))) m :=
+    IterState (FilterMapMH α γ γEquiv (fun it b => f b _ (pure <| ·.map (γEquiv it |>.hom)))) m :=
   ⟨it⟩
 
 /--
@@ -102,7 +102,7 @@ it.filterMapMH     ---a'-----c'-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → CodensityT m (Option γ)) (γEquiv : Equiv γ γ')
+def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → CodensityT m (Option γ)) (γEquiv : IterState α m → Equiv γ γ')
     (it : Iter (α := α) m β) :=
   ((toIter m <| Iterator.filterMapMH f γEquiv it.inner) : Iter m γ)
 
@@ -132,7 +132,7 @@ _TODO_: prove `Productive`. This requires us to wrap the FilterMapMH into a new 
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.mapMH [Monad m] [Iterator α m β] (f : β → CodensityT m γ) (γEquiv : Equiv γ γ') (it : Iter (α := α) m β) :=
+def Iter.mapMH [Monad m] [Iterator α m β] (f : β → CodensityT m γ) (γEquiv : IterState α m → Equiv γ γ') (it : Iter (α := α) m β) :=
   (it.filterMapMH (fun b => by exact some <$> f b) γEquiv : Iter m γ)
 
 /--
@@ -174,11 +174,11 @@ variable {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m] [Iterato
     {γ : Type v'} {γ' : Type w} {f : β → Option γ}
 
 @[inline]
-def Iter.filterMapH [Monad m] [Iterator α m β] (f : β → Option γ) (γEquiv : Equiv γ γ') (it : Iter (α := α) m β) :=
+def Iter.filterMapH [Monad m] [Iterator α m β] (f : β → Option γ) (γEquiv : IterState α m → Equiv γ γ') (it : Iter (α := α) m β) :=
   (it.filterMapMH (pure ∘ f : β → CodensityT m (Option γ)) γEquiv : Iter m γ)
 
 @[inline]
-def Iter.mapH [Monad m] [Iterator α m β] (f : β → γ) (γEquiv : Equiv γ γ') (it : Iter (α := α) m β) :=
+def Iter.mapH [Monad m] [Iterator α m β] (f : β → γ) (γEquiv : IterState α m → Equiv γ γ') (it : Iter (α := α) m β) :=
   (it.filterMapH (some ∘ f) γEquiv : Iter m γ)
 
 end FilterMapH
@@ -192,7 +192,7 @@ variable {m : Type w → Type w'} {α : Type u} {β : Type v} {γ : Type w} {f :
 
 @[inline]
 def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :=
-  (it.filterMapH f Equiv.id : Iter m γ)
+  (it.filterMapH f (fun _ => Equiv.id) : Iter m γ)
 
 @[inline]
 def Iter.map [Iterator α m β] [Monad m] (f : β → γ) (it : Iter (α := α) m β) :=
@@ -210,7 +210,7 @@ variable {m : Type w → Type w} {α : Type u} {β : Type v} {γ : Type w} {f : 
 
 @[inline]
 def Iter.filterMapM [Iterator α m β] [Monad m] (f : β → m (Option γ)) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (monadLift ∘ f) Equiv.id : Iter m γ)
+  (it.filterMapMH (monadLift ∘ f) (fun _ => Equiv.id) : Iter m γ)
 
 @[inline]
 def Iter.mapM [Iterator α m β] [Monad m] (f : β → m γ) (it : Iter (α := α) m β) :=

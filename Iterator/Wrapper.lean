@@ -13,7 +13,7 @@ structure Iter {α} (m β) [Iterator α m β] where
 variable {α : Type w} {α' : Type u} {m : Type w → Type w'} {β : Type v}
 
 def Iter.Relations.yielded [Iterator α m β] (it it' : Iter (α := α) m β) (output : β) : Prop :=
-  Iterator.yielded (m := m) it.inner it'.inner (Iterator.βEquiv.hom output)
+  Iterator.yielded (m := m) it.inner it'.inner (Iterator.βEquiv it.inner |>.hom output)
 
 def Iter.Relations.skipped [Iterator α m β] (it it' : Iter (α := α) m β) : Prop :=
   Iterator.skipped it.inner it'.inner
@@ -32,7 +32,7 @@ inductive Iter.Step [Iterator α m β] (it : Iter (α := α) m β) where
 @[always_inline, inline]
 def Iter.EncodedStep.decode [Iterator α m β] {it : Iter (α := α) m β} (step : it.EncodedStep) : it.Step :=
   match step.inner with
-  | .yield it' out h => .yield ⟨it'⟩ (Iterator.βEquiv.inv out) (by simp [Relations.yielded, Equiv.hom_inv, h])
+  | .yield it' out h => .yield ⟨it'⟩ (Iterator.βEquiv it.inner |>.inv out) (by simp [Relations.yielded, Equiv.hom_inv, h])
   | .skip it' h => .skip ⟨it'⟩ h
   | .done h => .done h
 
