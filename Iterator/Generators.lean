@@ -15,11 +15,10 @@ variable {m : Type w → Type w'}
 structure ListIterator (α : Type u) where
   list : List α
 
-instance {α} [Pure m] : Iterator (ListIterator α) m α where
-  α' := ListIterator α
-  β' := α
-  αEquiv := .id _
-  βEquiv := .id _
+instance {α} [Pure m] : Iterator (ListIterator α) (ListIterator α) m α where
+  βInternal := α
+  αEquiv := .id
+  βEquiv := .id
   yielded it it' a := it.list = a :: it'.list
   skipped _ _ := False
   done it := it.list = []
