@@ -39,8 +39,9 @@ Additional diagnostic information may be available using the `set_option diagnos
 -- as Rust
 
 def dependentFlatMap (l : List (List Nat)) : List Nat :=
-  let it := Iter.unfold Id 2 (· + 1) |>.zip (l.iter Id.{0}) -- It's not nice that this fails if we don't provide Id explicitly.
-  it.flatMapD (fun (x : Nat × List Nat) => (x.2.iter Id).filter fun y => y % x.1 = 0) |>.toList
+  let it := Iter.unfold Id 2 (· + 1) |>.zip l.iter -- It's not nice that this fails if we don't provide Id explicitly.
+  -- the ⟨_, ⟩ is a hack to provide the correct ComputableSmall instance
+  it.flatMapD (fun (x : Nat × List Nat) => ⟨_, (x.2.iter Id).filter fun y => y % x.1 = 0⟩) |>.toList
 
 /-- info: [2, 6, 9] -/
 #guard_msgs in
@@ -75,7 +76,7 @@ def printNumsForIn (l : List Nat) : IO Unit := do
     IO.println n
 
 def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
-  Iter.unfold 0 (fun _ => 0) IO |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
+  Iter.unfold IO 0 (fun _ => 0) |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
 
 /-
 info: [time("13:47:35.833520000"),

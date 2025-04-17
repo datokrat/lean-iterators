@@ -201,7 +201,7 @@ structure SigmaIterator {β : Type v} (α : β → Type u') where
   b : β
   inner : α b
 
-instance {β : Type w} {α : β → Type u'} [Monad m] [∀ b, Iterator (α b) m γ] :
+instance {β : Type v} {α : β → Type u'} [Monad m] [∀ b, Iterator (α b) m γ] :
     SimpleIterator (SigmaIterator α) m γ where
   step it := by
     exact matchStepH it.inner
@@ -286,11 +286,22 @@ least work for internal iterator types that contain a computationally cheap empt
 @[always_inline, inline]
 def Iter.flatMap {α : Type u} {β : Type v} {α₂ : Type u₂}
     {γ : Type x} {m : Type w → Type w'}
-    [Monad m] [Iterator α m β] [Iterator α₂ m γ] [ComputableUnivLE.{max u u₂, w}]
+    [Monad m] {_ : Iterator α m β} {_ : Iterator α₂ m γ} [ComputableUnivLE.{max u u₂, w}]
     {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} α₂}
     (f : β → Iter (α := α₂) m γ)
     (it : Iter (α := α) m β) :=
   (toIter m <| (⟨it.inner, none⟩ : FlatMap α (Iter.inner ∘ f)) : Iter m γ)
+
+set_option pp.universes true in
+@[always_inline, inline]
+def Iter.flatMapD {α : Type u} {β : Type v} {α₂ : β → Type u₂}
+    {γ : Type x} {m : Type w → Type w'}
+    [Monad m] {_ : Iterator α m β} {_ : (b : β) → Iterator (α₂ b) m γ}
+    [ComputableUnivLE.{max u u₂ v, w}] [ComputableUnivLE.{max u₂ v, w}]
+    {smallα : ComputableSmall.{w} α}
+    (f : (b : β) → (s : ComputableSmall.{w} (α₂ b)) × Iter (α := α₂ b) m γ (small := s))
+    (it : Iter (α := α) m β (small := smallα)) :=
+  it.flatMap (fun b => toIter m <| SigmaIterator.mk (α := α₂) b (f b).2.inner)
 
 end Iter
 

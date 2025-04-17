@@ -21,7 +21,8 @@ def Iter.forIn {m : Type w → Type w'} {n : Type w → Type w''} [Monad m] [Mon
   | .done _ => return init
 termination_by it.terminationByFinite
 
-instance {m} [Monad m] [Monad n] [MonadLiftT m n] {α β} [Iterator α m β] [Finite α m] :
+instance {m : Type w → Type w'} {n : Type w → Type w''} [Monad m] [Monad n] [MonadLiftT m n]
+    {α : Type u} {β : Type v} {_ : Iterator α m β} [Finite α m] {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β] :
     ForIn n (Iter (α := α) m β) β where
   forIn := Iter.forIn
 
