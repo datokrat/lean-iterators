@@ -1,6 +1,14 @@
 import Iterator
 import Std.Time
 
+def hideEggs :=
+  let colors : Iter Id String := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n => ((match n % 3 with | 0 => "green" | 1 => "red" | 2 => "yellow" | _ => "huh?") : String)
+  let chickens := ["Clucky", "Patches", "Fluffy"].iter Id
+  let eggs := chickens.flatMap (fun x : String => Iter.unfold Id x id |>.take 3) |>.zip colors
+  eggs.toList
+
+#eval hideEggs
+
 def firstOfEach (l : List (List Nat)) : List Nat :=
   l.iter.flatMap (·.iter.take 1) |>.toList
 

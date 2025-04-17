@@ -15,7 +15,7 @@ structure IterationT (m : Type w → Type w') (γ : Type u) where
   property : γ → Prop
   computation : CodensityT m { c : γ // property c }
 
-instance [Monad m] : Monad (IterationT m) where
+instance : Monad (IterationT m) where
   pure a := { property b := (b = a)
               computation := pure ⟨a, rfl⟩ }
   bind x f := { property a := ∃ b, (f b).property a ∧ x.property b
@@ -29,6 +29,10 @@ instance (m) [Monad m] : MonadLift m (IterationT m) where
 
 instance (m) [Monad m] : MonadLift (CodensityT m) (IterationT m) where
   monadLift t := { property := fun _ => True, computation := (⟨·, True.intro⟩) <$> t }
+
+@[always_inline, inline]
+def IterationT.liftWithProperty {p : γ → Prop} (t : CodensityT m { c : γ // p c }) : IterationT m γ :=
+  { property := p, computation := t }
 
 @[inline]
 def IterationT.mapH {γ : Type u} {m : Type w → Type w'} [Monad m]
@@ -76,6 +80,12 @@ class SimpleIterator.Finite [SimpleIterator α m β] [Monad m] where
   wf : WellFounded rel
   subrelation : {it it' : α} → ((SimpleIterator.step (m := m) it).mapH IterStep.successor).property (some it') → rel it' it
 
+variable (α m) in
+class SimpleIterator.Productive [SimpleIterator α m β] [Monad m] where
+  rel : α → α → Prop
+  wf : WellFounded rel
+  subrelation : {it it' : α} → (SimpleIterator.step (m := m) it).property (.skip it' ⟨⟩) → rel it' it
+
 instance [SimpleIterator α m β] [Monad m] [SimpleIterator.Finite α m] : Finite α m where
   wf := by
     refine Subrelation.wf (r := InvImage (SimpleIterator.Finite.rel m β) FiniteIteratorWF.inner) ?_ ?_
@@ -86,6 +96,15 @@ instance [SimpleIterator α m β] [Monad m] [SimpleIterator.Finite α m] : Finit
       · exact ⟨.skip x.inner ⟨⟩, rfl, h⟩
     · apply InvImage.wf
       exact SimpleIterator.Finite.wf
+
+instance [SimpleIterator α m β] [Monad m] [SimpleIterator.Productive α m] : Productive α m where
+  wf := by
+    refine Subrelation.wf (r := InvImage (SimpleIterator.Productive.rel m β) ProductiveIteratorWF.inner) ?_ ?_
+    · intro x y h
+      apply SimpleIterator.Productive.subrelation
+      exact h
+    · apply InvImage.wf
+      exact SimpleIterator.Productive.wf
 
 @[always_inline, inline]
 def matchStepH {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
@@ -141,5 +160,20 @@ theorem successor_matchStep {α : Type u} {m : Type w → Type w'} {β : Type v}
     (∃ it', Iterator.skipped m it it' ∧ (IterationT.mapH f <| skip it').property x) ∨
     (Iterator.done m it ∧ (IterationT.mapH f done).property x) :=
   successor_matchStepH h
+
+theorem property_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
+    [Monad m] [Iterator α m β]
+    {it : α} {yield skip done}
+    {x : γ}
+    (h : (matchStepH (m := m) (γ := γ) it yield skip done).property x) :
+    (∃ it' b, Iterator.yielded m it it' b ∧ (yield it' b).property x) ∨
+    (∃ it', Iterator.skipped m it it' ∧ (skip it').property x) ∨
+    (Iterator.done m it ∧ done.property x) := by
+  simp only [IterationT.bindH, matchStepH] at h
+  obtain ⟨c, h, h'⟩ := h
+  split at h
+  · exact Or.inl ⟨_, _, ‹_›, h⟩
+  · exact Or.inr <| Or.inl ⟨_, ‹_›, h⟩
+  · exact Or.inr <| Or.inr ⟨‹_›, h⟩
 
 end SimpleIterator

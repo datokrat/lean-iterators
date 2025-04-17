@@ -49,7 +49,7 @@ def CodensityT.eval [Bind m] {α : Type w} (x : m α) : CodensityT m α :=
 instance : Pure (CodensityT m) where
   pure x _ h := h x
 
-instance [Monad m] : Monad (CodensityT m) where
+instance : Monad (CodensityT m) where
   pure x _ h := h x
   bind x f _ h := x _ (f · _ h)
 
