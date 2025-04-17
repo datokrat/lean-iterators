@@ -53,23 +53,20 @@ instance : Finite (ListIterator α) m where
 
 end ListIterator
 
-/-
 section Unfold
 
 universe u v
 
-variable {m : Type u → Type v}
+variable {α : Type u} {m : Type w → Type w'} {f : α → α}
 
 structure UnfoldIterator (α : Type u) (f : α → α) where
   next : α
 
-instance [Pure m] : Iterator (UnfoldIterator α f) m α where
+instance : Iterator (UnfoldIterator α f) m α where
   yielded it it' a := it.next = a ∧ it'.next = f a
   skipped _ _ := False
-  finished _ := False
-
-instance [Pure m] : SteppableIterator (UnfoldIterator α f) m α where
-  intoMonad _ _ _
+  done _ := False
+  step
     | ⟨a⟩ => pure <| .yield ⟨f a⟩ a ⟨rfl, rfl⟩
 
 /--
@@ -77,7 +74,7 @@ Creates an infinite, productive iterator. First it yields `init`.
 If the last step yielded `a`, the next will yield `f a`.
 -/
 @[inline]
-def Iter.unfold (m : Type w → Type w' := by exact Id) {α : Type u} (init : α) (f : α → α) [Pure m] :=
+def Iter.unfold (m : Type w → Type w' := by exact Id) {α : Type u} (init : α) (f : α → α) [ComputableUnivLE.{u, w}] :=
   toIter m <| UnfoldIterator.mk (f := f) init
 
 instance [Pure m] : Productive (UnfoldIterator α f) m where
@@ -88,4 +85,3 @@ instance [Pure m] : Productive (UnfoldIterator α f) m where
     rintro _ ⟨⟩
 
 end Unfold
--/

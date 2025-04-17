@@ -32,6 +32,20 @@ inductive Iter.Step {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : It
 | skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.Step
 | done : Iterator.done m it.inner → it.Step
 
+inductive Iter.LiftedStep {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
+    (it : Iter (α := α) m β) where
+| yield : (it' : Iter (α := α) m β) → (b : ComputableSmall.Lift.{w} β) → Iterator.yielded m it.inner it'.inner (ComputableSmall.down b) → it.LiftedStep
+| skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.LiftedStep
+| done : Iterator.done m it.inner → it.LiftedStep
+
+@[always_inline, inline]
+def Iter.Step.lift {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
+    (it : Iter (α := α) m β) (step : it.Step) : it.LiftedStep :=
+  match step with
+  | .yield it' b h => .yield it' (ComputableSmall.up b) (by simp [ComputableSmall.down_up, h])
+  | .skip it' h => .skip it' h
+  | .done h => .done h
+
 @[always_inline, inline]
 def Iter.Step.ofInternal {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) (step : IterStep.for m it.inner) :
     it.Step :=

@@ -20,25 +20,26 @@ structure ZipH (α₁ : Type u₁) (β₁ : Type v₁) (α₂ : Type u₂) where
   right : α₂
 
 instance [Iterator α₁ m β₁] [Iterator α₂ m β₂] [Monad m] :
-    Iterator (ZipH α₁ β₁ α₂) m (β₁ × β₂) :=
-  Iteration.instIterator fun it => do
-      match it.memoizedLeft with
-      | none =>
-        matchStepH it.left
-          (fun it₁' b₁ => pure <| .skip ⟨it₁', some b₁, it.right⟩ ⟨⟩)
-          (fun it₁' => pure <| .skip ⟨it₁', none, it.right⟩ ⟨⟩)
-          (pure <| .done ⟨⟩)
-      | some b₁ =>
-        matchStepH it.right
-          (fun it₂' b₂ => pure <| .yield ⟨it.left, none, it₂'⟩ (b₁, b₂) ⟨⟩)
-          (fun it₂' => pure <| .skip ⟨it.left, some b₁, it₂'⟩ ⟨⟩)
-          (pure <| .done ⟨⟩)
+    SimpleIterator (ZipH α₁ β₁ α₂) m (β₁ × β₂) where
+  step it :=
+    match it.memoizedLeft with
+    | none =>
+      matchStepH it.left
+        (fun it₁' b₁ => pure <| .skip ⟨it₁', some b₁, it.right⟩ ⟨⟩)
+        (fun it₁' => pure <| .skip ⟨it₁', none, it.right⟩ ⟨⟩)
+        (pure <| .done ⟨⟩)
+    | some b₁ =>
+      matchStepH it.right
+        (fun it₂' b₂ => pure <| .yield ⟨it.left, none, it₂'⟩ (b₁, b₂) ⟨⟩)
+        (fun it₂' => pure <| .skip ⟨it.left, some b₁, it₂'⟩ ⟨⟩)
+        (pure <| .done ⟨⟩)
 
 @[inline]
-def Iter.zipH [Monad m]
-    (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :
+def Iter.zipH [Monad m] [ComputableUnivLE.{max u₁ u₂ v₁, w}]
+    {small₁ : ComputableSmall.{w} α₁} {small₂ : ComputableSmall.{w} α₂}
+    (left : Iter (α := α₁) m β₁ (small := small₁)) (right : Iter (α := α₂) m β₂ (small := small₂)) :
     Iter (α := ZipH α₁ β₁ α₂) m (β₁ × β₂) :=
-  ⟨left.inner, none, right.inner⟩
+  toIter m ⟨left.inner, none, right.inner⟩
 
 -- TODO: put this into core. This is also duplicated in FlatMap
 theorem ZipH.wellFounded_optionLt {α} {rel : α → α → Prop} (h : WellFounded rel) :
@@ -82,35 +83,36 @@ theorem ZipH.rel₁_of_right {left : α₁} {b : Option β₁} {it' it : α₂}
   Prod.Lex.right _ <| Prod.Lex.right _ h
 
 instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
-    Finite (ZipH α₁ β₁ α₂) m := by
-  refine finite_instIterator _ (rel := ZipH.rel₁ m) ?_ ?_
-  · apply InvImage.wf
+    SimpleIterator.Finite (ZipH α₁ β₁ α₂) m where
+  rel := ZipH.rel₁ m
+  wf := by
+    apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
     · refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
       · apply ZipH.wellFounded_optionLt
         exact emptyWf.wf
       · exact Productive.wf
-  · intro it it' h
+  subrelation {it it'} h := by
     obtain ⟨left, b, right⟩ := it
-    dsimp only at h
+    dsimp only [SimpleIterator.step] at h
     split at h
-    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStepH h
-      · cases up_successor_skip.mp h
+    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
+      · cases successor_skip.mp h
         apply ZipH.rel₁_of_left
         exact Or.inl ⟨_, hy⟩
-      · cases up_successor_skip.mp h
+      · cases successor_skip.mp h
         apply ZipH.rel₁_of_left
         exact Or.inr hs
-      · cases up_successor_done.mp h
-    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStepH h
-      · cases up_successor_yield.mp h
+      · cases successor_done.mp h
+    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
+      · cases successor_yield.mp h
         apply ZipH.rel₁_of_memoizedLeft
         trivial
-      · cases up_successor_skip.mp h
+      · cases successor_skip.mp h
         apply ZipH.rel₁_of_right
         exact hs
-      · cases up_successor_done.mp h
+      · cases successor_done.mp h
 
 def ZipH.lt_with_top {α} (r : α → α → Prop) : Option α → Option α → Prop
   | none, _ => false
@@ -157,35 +159,36 @@ theorem ZipH.rel₂_of_left {left' left : α₁} {b : Option β₁} {right : α�
   Prod.Lex.right _ <| Prod.Lex.right _ h
 
 instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
-    Finite (ZipH α₁ β₁ α₂) m := by
-  refine finite_instIterator _ (rel := ZipH.rel₂ m) ?_ ?_
-  · apply InvImage.wf
+    SimpleIterator.Finite (ZipH α₁ β₁ α₂) m where
+  rel := ZipH.rel₂ m
+  wf := by
+    apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
     · refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
       · apply ZipH.wellFounded_lt_with_top
         exact emptyWf.wf
       · exact Productive.wf
-  · intro it it' h
+  subrelation {it it'} h := by
     obtain ⟨left, b, right⟩ := it
-    dsimp only at h
+    dsimp only [SimpleIterator.step] at h
     split at h
-    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStepH h
-      · cases up_successor_skip.mp h
+    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
+      · cases successor_skip.mp h
         apply ZipH.rel₂_of_memoizedLeft
         trivial
-      · cases up_successor_skip.mp h
+      · cases successor_skip.mp h
         apply ZipH.rel₂_of_left
         exact hs
-      · cases up_successor_done.mp h
-    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := prop_successor_matchStepH h
-      · cases up_successor_yield.mp h
+      · cases successor_done.mp h
+    · obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
+      · cases successor_yield.mp h
         apply ZipH.rel₂_of_right
         exact Or.inl ⟨_, hy⟩
-      · cases up_successor_skip.mp h
+      · cases successor_skip.mp h
         apply ZipH.rel₂_of_right
         exact Or.inr <| hs
-      · cases up_successor_done.mp h
+      · cases successor_done.mp h
 
 end ZipH
 
@@ -225,7 +228,8 @@ _TODO:_ implement the `Productive` instance
 
 This combinator incurs an additional O(1) cost with each output of `left` or `right`.
 -/
-def Iter.zip (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :=
+def Iter.zip {small₁ : ComputableSmall.{w} α₁} {small₂ : ComputableSmall.{w} α₂} [ComputableUnivLE.{max u v}]
+    (left : Iter (α := α₁) m β₁ (small := small₁)) (right : Iter (α := α₂) m β₂ (small := small₂)) :=
   (Iter.zipH left right : Iter m (β₁ × β₂))
 
 end Zip
