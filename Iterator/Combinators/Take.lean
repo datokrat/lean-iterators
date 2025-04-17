@@ -53,8 +53,8 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 @[inline]
-def Iter.take [Monad m] {_ : Iterator α m β} [ComputableUnivLE.{u, w}] {_ : ComputableSmall.{w} α}
-    (n : Nat) (it : Iter (α := α) m β) :=
+def Iter.take [Monad m] {_ : Iterator α m β} [ComputableUnivLE.{u, w}] {small : ComputableSmall.{w} α}
+    (n : Nat) (it : Iter (α := α) m β (small := small)) :=
   toIter (α := Take α) m <| Take.mk n it.inner
 
 def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] :

@@ -10,7 +10,7 @@ import Iterator.Cont
 variable {α : Type u} {m : Type w → Type w'} {β : Type v}
 
 structure Iter {α : Type u} (m : Type w → Type w') (β : Type v)
-    [Iterator α m β] [ComputableSmall.{w} α] : Type w where
+    [Iterator α m β] [small : ComputableSmall.{w} α] : Type w where
   innerLifted : ComputableSmall.Lift α
 
 variable (m) in
