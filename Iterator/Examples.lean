@@ -45,6 +45,21 @@ def firstOfEach (l : List (List Nat)) : List Nat :=
 #guard_msgs in
 #eval firstOfEach [[1, 2], [], [3, 4]]
 
+def deepSum (l : List (List Nat)) : Nat :=
+  go (l.iter Id |>.flatMap fun l' => l'.iter Id) 0
+where
+  @[specialize]
+  go it acc :=
+    match it.step with
+    | .yield it' n _ => go it' (acc + n)
+    | .skip it' _ => go it' acc
+    | .done _ => acc
+  termination_by it.terminationByFinite
+
+/-- info: 10 -/
+#guard_msgs in
+#eval deepSum [[1, 2], [3, 4]]
+
 def staggeredCounting : List Nat :=
   Iter.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
     (fun i => Iter.unfold Id 0 (· + 1) |>.take i) |>.toList

@@ -133,6 +133,7 @@ abbrev IterStep.liftedFor {α β} (m) [Iterator α m β] (it : α) [ComputableSm
     (fun it' b => Iterator.yielded m it (ComputableSmall.down it') (ComputableSmall.down b))
     (fun it' => Iterator.skipped m it (ComputableSmall.down it')) (Iterator.done m it)
 
+@[always_inline, inline]
 def IterStep.up {α β m} [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
     {it : α} (step : IterStep.for m it) : IterStep.liftedFor m it :=
   match step with
@@ -140,12 +141,14 @@ def IterStep.up {α β m} [Iterator α m β] [ComputableSmall.{w} α] [Computabl
   | .skip it' h => .skip (ComputableSmall.up it') (by simp [ComputableSmall.down_up, h])
   | .done h => .done h
 
+@[always_inline, inline]
 def IterStep.down {α β m} [Iterator α m β] {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} β} {it : α} (step : IterStep.liftedFor m it) : IterStep.for m it :=
   match step with
   | .yield it' b h => .yield (ComputableSmall.down it') (ComputableSmall.down b) h
   | .skip it' h => .skip (ComputableSmall.down it') h
   | .done h => .done h
 
+@[always_inline, inline]
 def IterStep.raw {α β y s f} (step : IterStep α β y s f) : RawStep α β :=
   match step with
   | .yield it' b _ => .yield it' b ⟨⟩
