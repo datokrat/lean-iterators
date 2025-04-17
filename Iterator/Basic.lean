@@ -112,6 +112,8 @@ inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop
 | skip : (a : α) → skipped a → IterStep α β yielded skipped finished
 | done : finished → IterStep α β yielded skipped finished
 
+abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
+
 def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .yield it _ _ => some it
   | .skip it _ => some it
@@ -125,6 +127,30 @@ class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) w
 
 abbrev IterStep.for {α β} (m) [Iterator α m β] (it : α) :=
   IterStep α β (Iterator.yielded m it) (Iterator.skipped m it) (Iterator.done m it)
+
+abbrev IterStep.liftedFor {α β} (m) [Iterator α m β] (it : α) [ComputableSmall.{w} α] [ComputableSmall.{w} β] : Type w :=
+  IterStep (ComputableSmall.Lift α) (ComputableSmall.Lift β)
+    (fun it' b => Iterator.yielded m it (ComputableSmall.down it') (ComputableSmall.down b))
+    (fun it' => Iterator.skipped m it (ComputableSmall.down it')) (Iterator.done m it)
+
+def IterStep.up {α β m} [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
+    {it : α} (step : IterStep.for m it) : IterStep.liftedFor m it :=
+  match step with
+  | .yield it' b h => .yield (ComputableSmall.up it') (ComputableSmall.up b) (by simp [ComputableSmall.down_up, h])
+  | .skip it' h => .skip (ComputableSmall.up it') (by simp [ComputableSmall.down_up, h])
+  | .done h => .done h
+
+def IterStep.down {α β m} [Iterator α m β] {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} β} {it : α} (step : IterStep.liftedFor m it) : IterStep.for m it :=
+  match step with
+  | .yield it' b h => .yield (ComputableSmall.down it') (ComputableSmall.down b) h
+  | .skip it' h => .skip (ComputableSmall.down it') h
+  | .done h => .done h
+
+def IterStep.raw {α β y s f} (step : IterStep α β y s f) : RawStep α β :=
+  match step with
+  | .yield it' b _ => .yield it' b ⟨⟩
+  | .skip it' _ => .skip it' ⟨⟩
+  | .done _ => .done ⟨⟩
 
 section Finite
 

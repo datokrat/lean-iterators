@@ -1,12 +1,41 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
 import Iterator
 import Std.Time
 
-def hideEggs :=
-  let colors : Iter Id String := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n => ((match n % 3 with | 0 => "green" | 1 => "red" | 2 => "yellow" | _ => "huh?") : String)
+def hideEggs : IO Unit := do
+  -- Repeat colors and locations indefinitely
+  let colors := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+    #["green", "red", "yellow"][n % 3]!
+  let locations := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+    #["in a boot", "underneath a lampshade", "under the cushion", "in the lawn"][n % 4]!
+  -- Summon the chickens
   let chickens := ["Clucky", "Patches", "Fluffy"].iter Id
-  let eggs := chickens.flatMap (fun x : String => Iter.unfold Id x id |>.take 3) |>.zip colors
-  eggs.toList
+  -- Gather, color and hide the eggs
+  let eggs := chickens.flatMap (fun x : String => Iter.unfold Id x id |>.take 3)
+    |>.zip colors
+    |>.zip locations
+  -- Report the results (top secret)
+  let eggsIO := eggs.switchMonad (pure : ∀ {γ}, γ → IO γ) -- Obtain an IO-monadic iterator
+  for x in eggsIO do
+    IO.println s! "{x.1.1} hides a {x.1.2} egg {x.2}."
+  -- Alternative : eggsIO.mapM (fun x => IO.println s!"{x.1.1} hides a {x.1.2} egg {x.2}.") |>.drain
 
+/--
+info: Clucky hides a green egg in a boot.
+Clucky hides a red egg underneath a lampshade.
+Clucky hides a yellow egg under the cushion.
+Patches hides a green egg in the lawn.
+Patches hides a red egg in a boot.
+Patches hides a yellow egg underneath a lampshade.
+Fluffy hides a green egg under the cushion.
+Fluffy hides a red egg in the lawn.
+Fluffy hides a yellow egg in a boot.
+-/
+#guard_msgs in
 #eval hideEggs
 
 def firstOfEach (l : List (List Nat)) : List Nat :=

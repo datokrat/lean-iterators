@@ -7,5 +7,6 @@ prelude
 import Iterator.Combinators.Drop
 import Iterator.Combinators.FilterMap
 import Iterator.Combinators.FlatMap
+import Iterator.Combinators.MonadLift
 import Iterator.Combinators.Take
 import Iterator.Combinators.Zip

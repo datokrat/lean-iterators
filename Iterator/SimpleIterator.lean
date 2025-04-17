@@ -8,8 +8,6 @@ import Iterator.Wrapper
 
 section SimpleIterator
 
-abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
-
 @[ext]
 structure IterationT (m : Type w → Type w') (γ : Type u) where
   property : γ → Prop
@@ -47,6 +45,11 @@ def IterationT.bindH {m : Type w → Type w'} [Monad m] {γ : Type u} {δ : Type
     (t : IterationT m γ) (f : γ → IterationT m δ) : IterationT m δ :=
   { property d := ∃ c, (f c).property d ∧ t.property c
     computation := t.computation.bindH fun c => (f c.1).computation.mapH fun d => ⟨d.1, c.1, d.2, c.2⟩}
+
+def IterationT.liftInnerMonad {γ : Type w} {m : Type w → Type w'} [Pure m] (n : Type w → Type w'') [Monad n] [MonadLift m n] (t : IterationT m γ) :
+    IterationT n γ :=
+  { property := t.property
+    computation := monadLift t.computation.run }
 
 variable {α : Type u} {m : Type w → Type w'} {β : Type v}
 
