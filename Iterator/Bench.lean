@@ -13,21 +13,21 @@ open Std
 
 section ListIterator
 
--- set_option trace.compiler.ir true in
--- @[noinline]
--- def sum (l : List Nat) : Nat := Id.run do
---   let mut it := l.iter Id
---   let mut sum := 0
---   while true do
---     match it.step with
---     | .yield it' n _ =>
---       sum := sum + n
---       it := it'
---     | .skip it' _ =>
---       it := it'
---     | .done _ =>
---       break
---   return sum
+set_option trace.compiler.ir true in
+@[noinline]
+def sum (l : List Nat) : Nat := Id.run do
+  let mut it := l.iter Id
+  let mut sum := 0
+  while true do
+    match it.step with
+    | .yield it' n _ =>
+      sum := sum + n
+      it := it'
+    | .skip it' _ =>
+      it := it'
+    | .done _ =>
+      break
+  return sum
 
 end ListIterator
 
@@ -50,13 +50,13 @@ where
     | .yield it' n _ => go it' (acc + n)
     | .skip it' _ => go it' acc
     | .done _ => acc
-  termination_by finiteIteratorWF it (m := Id)
+  termination_by it.terminationByFinite
 
 set_option trace.compiler.ir.result true in
 @[noinline]
 def forInItSum (l : List Nat) : Nat := Id.run do
   let mut sum := 0
-  for x in l.iter do
+  for x in l.iter Id do
     sum := sum + x
   return sum
 
@@ -66,7 +66,7 @@ section FlatMap
 
 set_option trace.compiler.ir.result true in
 def testFlatMap (l : List (List Nat)) : Nat :=
-  go (l.iter.flatMap fun l' => l'.iter) 0
+  go (l.iter Id |>.flatMap fun l' => l'.iter Id) 0
 where
   @[specialize]
   go it acc :=
@@ -74,12 +74,13 @@ where
     | .yield it' n _ => go it' (acc + n)
     | .skip it' _ => go it' acc
     | .done _ => acc
-  termination_by finiteIteratorWF it
+  termination_by it.terminationByFinite
 
 set_option trace.compiler.ir.result true in
 def testFlatMap' (l : List (List Nat)) : Nat := Id.run do
   let mut sum := 0
-  for x in l.iter.flatMap (fun l' => l'.iter) do
+  -- Fails if we write l'.iter. This might be a Lean bug, but I need to investigate.
+  for x in (l.iter Id |>.flatMap (fun l' => List.iter l' Id)) do
     sum := sum + x
   return sum
 
@@ -103,7 +104,7 @@ where
       go it'
     | .done _ =>
       return
-  termination_by finiteIteratorWF it
+  termination_by it.terminationByFinite
 
 #eval testIO [1, 2, 3]
 

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.AbstractIteration
+import Iterator.SimpleIterator
 import Iterator.IteratorMorphism
 
 structure MonadEvalIterator (α : Type u) (m : Type w → Type w') where

@@ -5,7 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Wrapper
-import Iterator.AbstractIteration
+import Iterator.SimpleIterator
 
 /-!
 This file provides iterator combinators for filtering and mapping.

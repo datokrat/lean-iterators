@@ -82,11 +82,11 @@ loops (stream fusion).
 This API is still experimental and should not be relied on. As soon as it is clear that no fundamental
 changes are necessary, this disclaimer will be removed.
 
-* `Iterator.AbstractIteration` provides a monad that simplifies the construction and verification
-  (especially, verification of finiteness or productiveness) of iterators.
+* `Iterator.SimpleIterator` provides a convenient API for the implementation of iterator combinators.
+  Building combinators by hand can be much more tedious.
 * `Iterator.IteratorMorphism` provides another means to prove an iterator to be finite or productive
   by means of defining a structure-preserving map into another iterator type that is known to be
-  finite or productive.
+  finite or productive. (It's currently unused and broken.)
 
 ### Examples and benchmarks
 
