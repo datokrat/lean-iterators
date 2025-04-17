@@ -72,7 +72,7 @@ loops (stream fusion).
 
 * This file, `Iterator.Basic`, contains the definition of `Iterator`, `Finite` and `Productive`.
 * `Iterator.Wrapper` defines the convenience wrapper structure `Iter {α} m β`.
-* Generators (i.e., `.iter` methods for various data types) are provided in `Iterator.Generators`.
+* Producers (i.e., `.iter` methods for various data types) are provided in `Iterator.Producers`.
 * Combinators (i.e., ways to build new iterators out of existing ones) are provided in
   `Iterator.Combinators`.
 * Consumers (i.e., ways to actually iterate over an iterator) are provided in `Iterator.Consumers`.

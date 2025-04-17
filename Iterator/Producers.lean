@@ -23,8 +23,6 @@ instance {α} : Iterator (ListIterator α) m α where
     | { list := .nil } => pure <| .done rfl
     | { list := x :: xs } => pure <| .yield { list := xs } x rfl
 
--- TODO: check universes. It's _super_ weird that this works (note the w), but if I remove ComputableSmall,
--- it suddenly fails... It could produce the ComputableSmall.{u} instance either way
 /--
 Returns a finite iterator for the given list.
 The iterator yields the elements of the list in order and then terminates.

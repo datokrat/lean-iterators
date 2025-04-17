@@ -5,7 +5,7 @@ Authors: Paul Reichert
 -/
 import Iterator.Basic
 import Iterator.Bundled
-import Iterator.Generators
+import Iterator.Producers
 import Iterator.Combinators
 import Iterator.Consumers
 

@@ -1,4 +1,4 @@
-import Iterator.Generators
+import Iterator.Producers
 import Iterator.Combinators.Take
 import Iterator.Combinators.FilterMap
 import Iterator.Combinators.FlatMap
