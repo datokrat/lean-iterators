@@ -9,6 +9,7 @@ import Init.Classical
 import Init.Ext
 import Init.NotationExtra
 import Init.TacticsExtra
+import Iterator.Cont
 import Iterator.UnivLE
 
 /-!
@@ -117,30 +118,23 @@ def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
   | .done _ => none
 
 class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  αInternal : Type w
-  βInternal : Type w
-  αEquiv : Equiv α αInternal
-  βEquiv : αInternal → Equiv β βInternal
-  yielded : αInternal → αInternal → βInternal → Prop
-  skipped : αInternal → αInternal → Prop
-  done : αInternal → Prop
-  step : (it : αInternal) → m (IterStep αInternal βInternal (yielded it) (skipped it) (done it))
+  yielded : α → α → β → Prop
+  skipped : α → α → Prop
+  done : α → Prop
+  step : (it : α) → CodensityT m (IterStep α β (yielded it) (skipped it) (done it))
 
-def IterState (α : Type u) (m : Type w → Type w') {β : Type v} [Iterator α m β] : Type w :=
-  Iterator.αInternal α m
-
-abbrev IterStep.for {α β} (m) [Iterator α m β] (it : IterState α m) :=
-  IterStep (IterState α m) (Iterator.βInternal α m) (Iterator.yielded it) (Iterator.skipped it) (Iterator.done it)
+abbrev IterStep.for {α β} (m) [Iterator α m β] (it : α) :=
+  IterStep α β (Iterator.yielded m it) (Iterator.skipped m it) (Iterator.done m it)
 
 section Finite
 
 structure FiniteIteratorWF (α m) [Iterator α m β] where
-  inner : IterState α m
+  inner : α
 
 def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α m) : Prop :=
-  (∃ b : Iterator.βInternal α m, Iterator.yielded y.inner x.inner b) ∨ Iterator.skipped y.inner x.inner
+  (∃ b, Iterator.yielded m y.inner x.inner b) ∨ Iterator.skipped m y.inner x.inner
 
-def finiteIteratorWF {α m β} [Iterator α m β] (it : IterState α m) : FiniteIteratorWF α m :=
+def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α m :=
   ⟨it⟩
 
 class Finite (α m) [Iterator α m β] : Prop where
@@ -157,12 +151,12 @@ end Finite
 section Productive
 
 structure ProductiveIteratorWF (α m) [Iterator α m β] where
-  inner : IterState α m
+  inner : α
 
 def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α m) : Prop :=
-  Iterator.skipped y.inner x.inner
+  Iterator.skipped m y.inner x.inner
 
-def productiveIteratorWF {α m β} [Iterator α m β] (it : IterState α m) : ProductiveIteratorWF α m :=
+def productiveIteratorWF {α m β} [Iterator α m β] (it : α) : ProductiveIteratorWF α m :=
   ⟨it⟩
 
 class Productive (α m) [Iterator α m β] : Prop where

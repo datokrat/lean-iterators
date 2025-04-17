@@ -18,20 +18,12 @@ structure Take (α : Type u) where
   inner : α
 
 instance [Monad m] [Iterator α m β] : SimpleIterator (Take α) m β where
-  αInternal := Take (IterState α m)
-  βInternal := Iterator.βInternal α m
-  αEquiv := {
-      hom it := { inner := Iterator.αEquiv.hom it.inner, remaining := it.remaining }
-      inv it := { inner := Iterator.αEquiv.inv it.inner, remaining := it.remaining }
-      hom_inv := by simp [Equiv.hom_inv]
-      inv_hom := by simp [Equiv.inv_hom] }
-  βEquiv := Iterator.βEquiv
   step it :=
     match it with
     | { remaining := 0, inner := _ } => pure <| .done ⟨⟩
     | { remaining := remaining' + 1, inner := it } =>
       matchStep (m := m) it
-        (fun it' b => pure <| .yield ⟨remaining', it'⟩ (Iterator.βEquiv.hom b) ⟨⟩)
+        (fun it' b => pure <| .yield ⟨remaining', it'⟩ b ⟨⟩)
         (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩ ⟨⟩)
         (pure <| .done ⟨⟩)
 
@@ -61,19 +53,20 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 @[inline]
-def Iter.take [Iterator α m β] [Monad m] (n : Nat) (it : Iter (α := α) m β) :=
+def Iter.take [Monad m] {_ : Iterator α m β} [ComputableUnivLE.{u, w}] {_ : ComputableSmall.{w} α}
+    (n : Nat) (it : Iter (α := α) m β) :=
   toIter (α := Take α) m <| Take.mk n it.inner
 
 def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] :
-    Take (Iterator.αInternal α m) → Take (IterState α m) → Prop :=
+    Take α → Take α → Prop :=
   InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt)
     (fun it => (it.remaining, productiveIteratorWF (α := α) (m := m) it.inner))
 
-theorem Take.rel_of_remaining [Monad m] [Iterator α m β] {it it' : Take (IterState α m)}
+theorem Take.rel_of_remaining [Monad m] [Iterator α m β] {it it' : Take α}
     (h : it'.remaining < it.remaining) : Take.rel m it' it :=
   Prod.Lex.left _ _ h
 
-theorem Take.rel_of_inner [Monad m] [Iterator α m β] {remaining : Nat} {it it' : IterState α m}
+theorem Take.rel_of_inner [Monad m] [Iterator α m β] {remaining : Nat} {it it' : α}
     (h : (productiveIteratorWF (m := m) it').lt (productiveIteratorWF it)) :
     Take.rel m ⟨remaining, it'⟩ ⟨remaining, it⟩ :=
   Prod.Lex.right _ h

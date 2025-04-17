@@ -15,11 +15,7 @@ variable {m : Type w → Type w'}
 structure ListIterator (α : Type u) where
   list : List α
 
-instance {α} [Pure m] : Iterator (ListIterator α) m α where
-  αInternal := ListIterator α
-  βInternal := α
-  αEquiv := .id
-  βEquiv := .id
+instance {α} : Iterator (ListIterator α) m α where
   yielded it it' a := it.list = a :: it'.list
   skipped _ _ := False
   done it := it.list = []
@@ -27,12 +23,15 @@ instance {α} [Pure m] : Iterator (ListIterator α) m α where
     | { list := .nil } => pure <| .done rfl
     | { list := x :: xs } => pure <| .yield { list := xs } x rfl
 
+-- TODO: check universes. It's _super_ weird that this works (note the w), but if I remove ComputableSmall,
+-- it suddenly fails... It could produce the ComputableSmall.{u} instance either way
 /--
 Returns a finite iterator for the given list.
 The iterator yields the elements of the list in order and then terminates.
 -/
 @[inline]
-def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id) [Pure m] : Iter (α := ListIterator α) m α :=
+def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id) [ComputableSmall.{w} α] :
+    Iter (α := ListIterator α) m α :=
   toIter m { list := l }
 
 -- TODO
@@ -40,7 +39,7 @@ def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id)
 -- def List.iterH {α : Type u} (l : List α) (m) [Pure m] : Iter (α := ListIterator α) m α :=
 --   toIter m { list := l }
 
-theorem ListIterator.subrelation [Pure m] :
+theorem ListIterator.subrelation :
     Subrelation (FiniteIteratorWF.lt (α := ListIterator α) (m := m))
       (InvImage WellFoundedRelation.rel (ListIterator.list ∘ FiniteIteratorWF.inner)) := by
   intro x y hlt
@@ -49,7 +48,7 @@ theorem ListIterator.subrelation [Pure m] :
   cases hlt
   simp_all
 
-instance [Pure m] : Finite (ListIterator α) m where
+instance : Finite (ListIterator α) m where
   wf := ListIterator.subrelation.wf (InvImage.wf _ WellFoundedRelation.wf)
 
 end ListIterator

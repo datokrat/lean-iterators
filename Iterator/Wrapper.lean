@@ -7,42 +7,38 @@ prelude
 import Iterator.Basic
 import Iterator.Cont
 
-structure Iter {α} (m β) [Iterator α m β] where
-  inner : IterState α m
+variable {α : Type u} {m : Type w → Type w'} {β : Type v}
 
-variable {α : Type w} {α' : Type u} {m : Type w → Type w'} {β : Type v}
+structure Iter {α : Type u} (m : Type w → Type w') (β : Type v)
+    [Iterator α m β] [ComputableSmall.{w} α] : Type w where
+  innerLifted : ComputableSmall.Lift α
 
-def Iter.Relations.yielded [Iterator α m β] (it it' : Iter (α := α) m β) (output : β) : Prop :=
-  Iterator.yielded (m := m) it.inner it'.inner (Iterator.βEquiv it.inner |>.hom output)
-
-def Iter.Relations.skipped [Iterator α m β] (it it' : Iter (α := α) m β) : Prop :=
-  Iterator.skipped it.inner it'.inner
-
-def Iter.Relations.done [Iterator α m β] (it : Iter (α := α) m β) : Prop :=
-  Iterator.done it.inner
-
-structure Iter.EncodedStep [Iterator α m β] (it : Iter (α := α) m β) where
-  inner : IterStep.for m it.inner
-
-inductive Iter.Step [Iterator α m β] (it : Iter (α := α) m β) where
-  | yield : (it' : Iter (α := α) m β) → (output : β) → Iter.Relations.yielded it it' output → it.Step
-  | skip : (it' : Iter (α := α) m β) → Iter.Relations.skipped it it' → it.Step
-  | done : Iter.Relations.done it → it.Step
+variable (m) in
+@[always_inline, inline]
+def toIter [Iterator α m β] [ComputableSmall.{w} α] (it : α) : Iter (α := α) m β :=
+  ⟨ComputableSmall.up it⟩
 
 @[always_inline, inline]
-def Iter.EncodedStep.decode [Iterator α m β] {it : Iter (α := α) m β} (step : it.EncodedStep) : it.Step :=
-  match step.inner with
-  | .yield it' out h => .yield ⟨it'⟩ (Iterator.βEquiv it.inner |>.inv out) (by simp [Relations.yielded, Equiv.hom_inv, h])
-  | .skip it' h => .skip ⟨it'⟩ h
+def Iter.inner {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) : α :=
+  ComputableSmall.down it.innerLifted
+
+@[simp]
+theorem inner_toIter {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : α) :
+    (toIter m it).inner = it :=
+  ComputableSmall.down_up
+
+inductive Iter.Step {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) where
+| yield : (it' : Iter (α := α) m β) → (b : β) → Iterator.yielded m it.inner it'.inner b → it.Step
+| skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.Step
+| done : Iterator.done m it.inner → it.Step
+
+@[always_inline, inline]
+def Iter.Step.ofInternal {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) (step : IterStep.for m it.inner) :
+    it.Step :=
+  match step with
+  | .yield it' b h => .yield (toIter m it') b (by simp only [inner_toIter, h])
+  | .skip it' h => .skip (toIter m it') (by simp only [inner_toIter, h])
   | .done h => .done h
-
-@[always_inline, inline]
-def Iter.EncodedStep.ofInternal [Iterator α m β] {it : Iter (α := α) m β} (step : IterStep.for m it.inner) : it.EncodedStep :=
-  ⟨step⟩
-
-@[always_inline, inline]
-def toIter (m) [Iterator α m β] (it : IterState α m) : Iter (α := α) m β :=
-  ⟨it⟩
 
 -- instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m β where
 --   yielded it it' b := Iterator.yielded m it.inner it'.inner b
@@ -61,20 +57,16 @@ def toIter (m) [Iterator α m β] (it : IterState α m) : Iter (α := α) m β :
 --   wf := InvImage.wf (productiveIteratorWF ∘ Iter.inner ∘ ProductiveIteratorWF.inner) Productive.wf
 
 @[always_inline, inline]
-def Iter.stepH [Monad m]
-    [Iterator α m β] (it : Iter (α := α) m β) : m it.EncodedStep :=
-  Iter.EncodedStep.ofInternal <$> Iterator.step it.inner
+def Iter.stepH [Monad m] {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) :
+    CodensityT m it.Step :=
+  Iterator.step it.inner |>.mapH (Iter.Step.ofInternal it)
 
 @[always_inline, inline]
-def Iter.stepCont [Monad m]
-    [Iterator α m β] (it : Iter (α := α) m β) {γ} : ContT m γ it.Step :=
-  fun h => it.stepH >>= (h ·.decode)
+def Iter.step {β : Type w} [Monad m] {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) :
+    m (Iter.Step it) :=
+  it.stepH.run
 
 @[always_inline, inline]
-def Iter.step {α β : Type w} (m : Type w → Type w) [Monad m]
-    [Iterator α m β] (it : Iter (α := α) m β) : m (Iter.Step it) :=
-  Iter.EncodedStep.decode <$> it.stepH
-
-@[always_inline, inline]
-def Iter.terminationByFinite [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : FiniteIteratorWF α m :=
+def Iter.terminationByFinite {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [Finite α m] (it : Iter (α := α) m β) :
+    FiniteIteratorWF α m :=
   finiteIteratorWF it.inner

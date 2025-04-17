@@ -36,11 +36,18 @@ def CodensityT.run [Pure m] {α : Type w} (x : CodensityT m α) := x _ pure
 
 @[always_inline, inline]
 def CodensityT.mapH {β : Type u} {γ : Type u'} (f : β → γ) (x : CodensityT m β) : CodensityT m γ :=
-  fun _ h => x _ <| h ∘ f
+  fun _ h => x _ (h ∘ f)
+
+@[always_inline, inline]
+def CodensityT.bindH {β : Type u} {γ : Type u'} (x : CodensityT m β) (f : β → CodensityT m γ) : CodensityT m γ :=
+  fun _ h => x _ (f · _ h)
 
 @[always_inline, inline]
 def CodensityT.eval [Bind m] {α : Type w} (x : m α) : CodensityT m α :=
   fun _ h => x >>= h
+
+instance : Pure (CodensityT m) where
+  pure x _ h := h x
 
 instance [Monad m] : Monad (CodensityT m) where
   pure x _ h := h x

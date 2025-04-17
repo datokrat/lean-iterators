@@ -69,7 +69,7 @@ section FlatMap
 section FlattenDef
 
 variable {α : Type u} {β : Type v} {β' : Type w} {α₂ : Type u₂}
-  {γ : Type x} {γ' : Type w} {m : Type w → Type w'} {f : β → α₂}
+  {γ : Type x} {m : Type w → Type w'} {f : β → α₂}
 
 @[ext]
 structure FlatMap (α : Type w) (f : β → α₂) where
@@ -80,42 +80,26 @@ structure FlatMap (α : Type w) (f : β → α₂) where
 def FlatMap.init (it : α) (f : β → α₂) : FlatMap α f :=
   ⟨it, none⟩
 
-variable (α α₂ m) in
-abbrev MonomorphicState [Iterator α m β] [Iterator α₂ m γ]:= IterState α m × Option (IterState α₂ m)
-
 variable (m f) in
 @[always_inline, inline]
-def flatMapStepNone [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : IterState α m) :
-    IterationT m (RawStep (MonomorphicState α α₂ m) (Iterator.βInternal (α := α₂) (m := m))) :=
-  matchStep it₁
-    (fun it₁' b => pure <| .skip ⟨it₁', some (Iterator.αEquiv.hom <| f b)⟩ ⟨⟩)
+def flatMapStepNone [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : α) :
+    IterationT m (RawStep (FlatMap α f) γ) :=
+  matchStepH it₁
+    (fun it₁' b => pure <| .skip ⟨it₁', some (f b)⟩ ⟨⟩)
     (fun it₁' => pure <| .skip ⟨it₁', none⟩ ⟨⟩)
     (pure <| .done ⟨⟩)
 
 variable (m f) in
 @[always_inline, inline]
-def flatMapStepSome [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : IterState α m) (it₂ : IterState α₂ m) :
-    IterationT m (RawStep (MonomorphicState α α₂ m) (Iterator.βInternal (α := α₂) (m := m))) :=
-  matchStep it₂
-    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ (Iterator.βEquiv it₂ |>.hom b) ⟨⟩)
+def flatMapStepSome [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : α) (it₂ : α₂) :
+    IterationT m (RawStep (FlatMap α f) γ) :=
+  matchStepH it₂
+    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ b ⟨⟩)
     (fun it₂' => pure <| .skip ⟨it₁, some it₂'⟩ ⟨⟩)
     (flatMapStepNone m f it₁)
 
+-- TODO: avoid duplication of matching on it₁, which will produce bloated code
 instance [Monad m] [Iterator α m β] [Iterator α₂ m γ] : SimpleIterator (FlatMap α f) m γ where
-  αInternal := MonomorphicState α α₂ m
-  βInternal := Iterator.βInternal (α := α₂) (m := m)
-  αEquiv := by
-    refine ⟨fun it => ⟨Iterator.αEquiv.hom it.1, it.2.map Iterator.αEquiv.hom⟩,
-      fun it => ⟨Iterator.αEquiv.inv it.1, it.2.map Iterator.αEquiv.inv⟩, ?_, ?_⟩
-    · intro
-      ext
-      · exact Iterator.αEquiv.hom_inv
-      · simp [Option.map_map, Function.comp_def, Iterator.αEquiv.hom_inv]
-    · intro
-      ext
-      · exact Iterator.αEquiv.inv_hom
-      · simp [Option.map_map, Function.comp_def, Iterator.αEquiv.inv_hom]
-  βEquiv it := Iterator.βEquiv
   step it := match it with
     | ⟨it₁, none⟩ => flatMapStepNone m f it₁
     | ⟨it₁, some it₂⟩ => flatMapStepSome m f it₁ it₂
@@ -128,39 +112,41 @@ variable {α : Type u} {β : Type v} {β' : Type w} {α₂ : Type u₂}
     {γ : Type x} {γ' : Type w} {m : Type w → Type w'} {f : β → α₂}
 
 variable (α m f) in
-def rel [Monad m] [Iterator α m β] [Iterator α₂ m γ] : IterState (FlatMap α f) m → IterState (FlatMap α f) m → Prop :=
-  Prod.Lex
-    (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
-    (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m))))
+def rel [Monad m] [Iterator α m β] [Iterator α₂ m γ] : (FlatMap α f) → (FlatMap α f) → Prop :=
+  InvImage
+    (Prod.Lex
+      (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
+      (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))))
+    (fun it => (it.it₁, it.it₂))
 
 theorem FlatMap.rel_of_left [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it it'}
-    (h : (finiteIteratorWF it'.1).lt (finiteIteratorWF it.1)) : rel α m f it' it :=
+    (h : (finiteIteratorWF (m := m) it'.it₁).lt (finiteIteratorWF it.it₁)) : rel α m f it' it :=
   Prod.Lex.left _ _ h
 
 theorem FlatMap.rel_of_right [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ it₂ it₂'}
-    (h : (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))) it₂' it₂) : rel α m f ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
+    (h : (Option.lt (InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))) it₂' it₂) :
+    rel α m f ⟨it₁, it₂'⟩ ⟨it₁, it₂⟩ :=
   Prod.Lex.right _ h
 
 theorem descending_flattenStepNone
-    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : IterState α m} {it' : IterState (FlatMap α f) m}
-    (h : (IterStep.successor <$> flatMapStepNone m f it₁).property (some it')) :
+    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : α} {it' : FlatMap α f}
+    (h : (flatMapStepNone m f it₁ |>.mapH IterStep.successor).property (some it')) :
     (finiteIteratorWF (m := m) it'.1).lt (finiteIteratorWF it₁) := by
   simp only [flatMapStepNone] at h
-  have := successor_matchStep h
+  have := successor_matchStepH h
   obtain ⟨it'', b, hy, h⟩ | ⟨it'', hs, h⟩ | ⟨hd, h⟩ := this
-  -- TODO: We might get rid of these type hints by making the relation etc. work on α, not IterState α m.
-  · cases successor_skip (α := FlatMap α f) (m := m) |>.mp h
+  · cases successor_skip.mp h
     exact Or.inl ⟨_, hy⟩
-  · cases successor_skip (α := FlatMap α f) (m := m) |>.mp h
+  · cases successor_skip.mp h
     exact Or.inr hs
-  · cases successor_done (α := FlatMap α f) (m := m) |>.mp h
+  · cases successor_done.mp h
 
 theorem descending_flattenStepSome
-    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : IterState α m} {it₂ : IterState α₂ m} {it' : IterState (FlatMap α f) m}
-    (h : (IterStep.successor <$> flatMapStepSome m f it₁ it₂).property (some it')) :
+    [Monad m] [Iterator α m β] [Iterator α₂ m γ] {it₁ : α} {it₂ : α₂} {it' : FlatMap α f}
+    (h : (flatMapStepSome m f it₁ it₂ |>.mapH IterStep.successor).property (some it')) :
     rel α m f it' ⟨it₁, it₂⟩ := by
   simp only [flatMapStepSome] at h
-  obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
+  obtain ⟨it', b, hy, h⟩ | ⟨it', hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
   · cases successor_yield (α := FlatMap α f) (m := m) |>.mp h
     apply FlatMap.rel_of_right
     exact Or.inl ⟨_, hy⟩
@@ -193,6 +179,7 @@ instance [Monad m] [Iterator α m β] [Iterator α₂ m γ] [Finite α m] [Finit
     SimpleIterator.Finite (FlatMap α f) m where
   rel := rel α m f
   wf := by
+    apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact InvImage.wf _ Finite.wf
     · exact Option.wellFounded_lt <| InvImage.wf _ Finite.wf
@@ -208,26 +195,17 @@ end Finite
 section Dependent
 
 variable {m : Type w → Type w'}
-  {β : Type w} {α : β → Type u} {γ : Type v}
+  {β : Type v} {α : β → Type u'} {γ : Type v'}
 
-structure SigmaIterator {β : Type v} (α : β → Type u) where
+structure SigmaIterator {β : Type v} (α : β → Type u') where
   b : β
   inner : α b
 
-instance {β : Type w} {α : β → Type u} {α' : β → Type u'}
-    [Monad m] [∀ b, Iterator (α b) m γ] :
+instance {β : Type w} {α : β → Type u'} [Monad m] [∀ b, Iterator (α b) m γ] :
     SimpleIterator (SigmaIterator α) m γ where
-  αInternal := SigmaIterator (fun b => IterState (α b) m)
-  βInternal := (b : β) × Iterator.βInternal (α := α b) (m := m)
-  αEquiv := {
-      hom it := { b := it.b, inner := Iterator.αEquiv.hom it.inner },
-      inv it := { b := it.b, inner := Iterator.αEquiv.inv it.inner },
-      hom_inv := sorry
-      inv_hom := sorry }
-  βEquiv :=
   step it := by
-    exact matchStep it.inner
-      (fun it' c => pure <| .yield ⟨it.b, it'⟩ ⟨it.b, Iterator.βEquiv.hom c⟩ ⟨⟩)
+    exact matchStepH it.inner
+      (fun it' c => pure <| .yield ⟨it.b, it'⟩ c ⟨⟩)
       (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
       (pure <| .done ⟨⟩)
 
@@ -244,8 +222,8 @@ def SigmaIterator.rel [∀ b, Iterator (α b) m γ] :
     SigmaIterator α → SigmaIterator α → Prop :=
   SigmaIterator.lex (fun _ => InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m)))
 
-instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
-    [Monad m] [∀ b, Iterator (α b) (α' b) m γ] [∀ b, Finite (α b) m] : SimpleIterator.Finite (SigmaIterator α) m where
+instance {β : Type w} {α : β → Type u'}
+    [Monad m] [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] : SimpleIterator.Finite (SigmaIterator α) m where
   rel := SigmaIterator.rel m
   wf := by
     rw [SigmaIterator.rel]
@@ -257,7 +235,7 @@ instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
       apply InvImage.wf
       exact Finite.wf
   subrelation {it it'} h := by
-    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
+    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
     · cases successor_yield.mp h
       apply SigmaIterator.lex_of_right
       exact Or.inl ⟨_, hy⟩
@@ -265,9 +243,6 @@ instance {β : Type w} {α : β → Type w} {α' : β → Type u'}
       apply SigmaIterator.lex_of_right
       exact Or.inr hs
     · cases successor_done.mp h
-
-variable {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m]
-  {α' : β → Type u'} {β' : Type v'} {f : (b : β) → α' b}
 
 end Dependent
 
@@ -311,147 +286,12 @@ least work for internal iterator types that contain a computationally cheap empt
 @[always_inline, inline]
 def Iter.flatMap {α : Type u} {β : Type v} {α₂ : Type u₂}
     {γ : Type x} {m : Type w → Type w'}
-    [Monad m] [Iterator α m β] [Iterator α₂ m γ] (f : β → Iter (α := α₂) m γ)
+    [Monad m] [Iterator α m β] [Iterator α₂ m γ] [ComputableUnivLE.{max u u₂, w}]
+    {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} α₂}
+    (f : β → Iter (α := α₂) m γ)
     (it : Iter (α := α) m β) :=
-  letI : β → α₂ := Iterator.αEquiv.inv ∘ Iter.inner ∘ f
-  (toIter (α := FlatMap α this) m <| ((it.inner, none) : MonomorphicState α α₂ m) : Iter m γ)
-
-#exit
-
-/--
-Given an iterator `it` and a dependently typed, iterator-valued mapping function `f`, `it.flatMapD f`
-is an iterator that applies `f` to each output of `it` and concatenates all of the iterators
-obtained by applying `f`.
-It will yield all of the outputs of the current inner inner iterator before making the
-next step with `it`.
-
-**Marble diagram:**
-
-```text
-it                 ---a    ---b     c    --d--⊥
-f a                   a1-a2⊥
-f b                           b1-b2 ⊥
-f c                                 c1-c2⊥
-f d                                        ⊥
-it.flatMapD        ---a1-a2---b1-b2 c1-c2  ---⊥
-```
-
-Note that it is always possible for the implementation to insert some skip steps in between.
-The insertion of additional skip steps is an implementation detail and should not be relevant
-for any consumer.
-
-**Termination properties:**
-
-* `Finite` instance: only if `it` and all of the iternal iterators are finite
-* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
-
-_TODO:_ implement the `Productive` instance
-
-**Performance:**
-
-This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
-
-_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
-least work for internal iterator types that contain a computationally cheap empty iterator.
--/
-@[always_inline, inline]
-def Iter.flatMapD {α : Type u} {β : Type v} {α₂ : β → Type u₂}
-    {γ : Type x} {m : Type w → Type w'} [Monad m] [Iterator α m β] [∀ b, Iterator (α₂ b) m γ]
-    (f : (b : β) → Iter (α := α₂ b) m γ) (it : Iter (α := α) m β) :=
-  let βEquiv := Iterator.βEquiv (α := α) (m := m)
-  -- TODO: why does this cause an error if I use `let`?
-  letI σit b := toIter m <| SigmaIterator.mk (α := (α₂ <| βEquiv.inv ·)) (βEquiv.hom b)
-    (by
-      simp only [βEquiv.inv_hom]
-      exact (f b).inner)
-  (it.flatMap σit : Iter m γ)
+  (toIter m <| (⟨it.inner, none⟩ : FlatMap α (Iter.inner ∘ f)) : Iter m γ)
 
 end Iter
-
-section Simple
-
-/--
-Given an iterator `it`, an iterator-valued mapping function `f`,
-`it.flatMap f` is an iterator that applies `f` to each output of `it` to obtain an inner iterator.
-The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
-next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
-
-**Marble diagram:**
-
-```text
-it                 ---a    ---b     c    --d--⊥
-f a                   a1-a2⊥
-f b                           b1-b2 ⊥
-f c                                 c1-c2⊥
-f d                                        ⊥
-it.flatMap         ---a1-a2---b1-b2 c1-c2  ---⊥
-```
-
-Note that it is always possible for the implementation to insert some skip steps in between.
-The insertion of additional skip steps is an implementation detail and should not be relevant
-for any consumer.
-
-**Termination properties:**
-
-* `Finite` instance: only if `it` and all of the iternal iterators are finite
-* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
-
-_TODO:_ implement the `Productive` instance
-
-**Performance:**
-
-This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
-
-_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
-least work for internal iterator types that contain a computationally cheap empty iterator.
--/
-@[inline]
-def Iter.flatMap {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m] [Iterator α m β]
-    {α' : Type u} {β' : Type v} [Iterator α' m β'] (f : β → α') (it : Iter (α := α) m β) :=
-  (it.flatMapH f : Iter m β')
-
-/--
-Given an iterator `it`, an iterator-valued mapping function `f`,
-`it.flatMapD f` is an iterator that applies `f` to each output of `it` to obtain an inner iterator.
-The `flatMap` iterator will yield all of the outputs of such an inner iterator before making the
-next step with `it`. In other words, `it` flattens the iterator of iterators obtained by mapping with `f`.
-
-**Marble diagram:**
-
-```text
-it                 ---a    ---b     c    --d--⊥
-f a                   a1-a2⊥
-f b                           b1-b2 ⊥
-f c                                 c1-c2⊥
-f d                                        ⊥
-it.flatMapD        ---a1-a2---b1-b2 c1-c2  ---⊥
-```
-
-Note that it is always possible for the implementation to insert some skip steps in between.
-The insertion of additional skip steps is an implementation detail and should not be relevant
-for any consumer.
-
-**Termination properties:**
-
-* `Finite` instance: only if `it` and all of the iternal iterators are finite
-* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
-
-_TODO:_ implement the `Productive` instance
-
-**Performance:**
-
-This combinator incurs an additional O(1) cost with each output of `it` or an internal stream.
-
-_TODO_: Improve this so that the cost is only incurred with each output of `it`. This should at
-least work for internal iterator types that contain a computationally cheap empty iterator.
--/
-@[inline]
-def Iter.flatMapD {α : Type u} {β : Type v} {m : Type w → Type w'} [Monad m] [Iterator α m β]
-    {α' : β → Type u} {β' : Type v} [∀ b, Iterator (α' b) m β'] (f : (b : β) → α' b) (it : Iter (α := α) m β) :=
-  (it.flatMapHD f : Iter m β')
-
-end Simple
-
-end General
 
 end FlatMap

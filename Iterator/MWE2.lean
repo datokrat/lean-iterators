@@ -1,23 +1,52 @@
-class X (α : Type u) (β : outParam (Type v)) where
 
-structure Wrapper (α : Type u) : Type u where
+class ComputableUnivLE.{u, v} where
+  Lift : Type u → Type v
 
-instance {α α₂ : Type w} {α' : Type u} {α₂' : Type v} [X α α'] [X α₂ α₂'] :
-  X (α × α₂) (PUnit.{max u v + 1} : Type max u v) := sorry
+instance ComputableUnivLE.self : ComputableUnivLE.{0, 0} where
+  Lift α := sorry
 
-instance {α} : X (Wrapper α) (Wrapper α) := sorry
+instance ComputableUnivLE.ofMax [i : ComputableUnivLE.{v, v}] : ComputableUnivLE.{0, v} where
+  Lift α := sorry
 
-def f {β γ : Type w} (x : (Wrapper γ) × (Wrapper γ)) (y : (Wrapper β) × (Wrapper β)) :
-    ((Wrapper β) × (Wrapper γ)) × PUnit.{w + 1} := sorry
+-- adding the zero instance _after `ofMax`_ resolves the errors
+-- instance ComputableUnivLE.zero : ComputableUnivLE.{0, u} := sorry
 
-def g {α α' : Type w} [X α α'] (it : α × α') : Nat := sorry
+class ComputableSmall.{v} (α : Type 0) where
+  Lift : Type v
+
+instance [ComputableUnivLE.{0, v}] {α} : ComputableSmall.{v} α where
+  Lift := ComputableUnivLE.Lift α -- replacing this with sorry resolves the errors
+
+structure Iter {α : Type 0} (m : Type w → Type 0) (β : Type 0) [ComputableSmall.{w} α] where
+
+inductive T where
+inductive W
+inductive X
+inductive Y
+| y : Y
+
+def Y.iter (l : Y) : Iter (α := X) Id W := sorry
+
+-- replacing w with 0 resolves the errors
+-- replacing m altogether with Id, too
+@[inline]
+def Iter.take {α : Type 0} {m : Type w → Type 0}
+    -- exchanging ComputableUnivLE and n resolves the errors
+    [ComputableUnivLE.{0, w}]
+    (n : Nat) {_ : ComputableSmall.{w} α} (it : Iter (α := α) m W) : Iter (α := T) m W :=
+  sorry
+
+def flatMap {β : Type 0} {_ : ComputableSmall.{0} T} (f : β → Iter (α := T) Id W) (it : β) :
+    W := sorry
 
 set_option pp.universes true in
 set_option pp.explicit true in
-def firstOfEach {α} (l : List (List α)) : Nat :=
-  g (f (sorry : (Wrapper (List α)) × (Wrapper (List α))) ((sorry : (Wrapper α) × (Wrapper α))))
+def fails :=
+  flatMap (fun x => x.iter |>.take 1) Y.y
+where
+  x := 0
 
-set_option pp.universes true in
-set_option pp.explicit true in
-def firstOfEach' {α : Type u} (l : List (List α)) : Nat :=
-  g (f (sorry : (Wrapper (List α)) × (Wrapper (List α))) ((sorry : (Wrapper α) × (Wrapper α))))
+def succeeds :=
+  flatMap (fun x => Y.iter x |>.take 1) Y.y
+where
+  x := 0
