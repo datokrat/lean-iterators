@@ -272,7 +272,7 @@ for any consumer.
 **Termination properties:**
 
 * `Finite` instance: only if `it` and all of the iternal iterators are finite
-* `Productive` instance: only if `it` it finite and all of the internal iterators are productive
+* `Productive` instance: only if `it` is finite and all of the internal iterators are productive
 
 _TODO:_ implement the `Productive` instance
 
