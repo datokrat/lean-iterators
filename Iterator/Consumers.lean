@@ -37,6 +37,30 @@ def Iter.fold {m : Type w → Type w'} {n : Type w → Type w'} [Monad m] [Monad
   | .done _ => return init
 termination_by it.terminationByFinite
 
+@[specialize]
+def Iter.count {α : Type u} {β : Type v} {_ : Iterator α Id β} [Finite α Id] {_ : ComputableSmall.{0} α}
+    (it : Iter (α := α) Id β) : Nat :=
+  go it 0
+where
+  go [Finite α Id] it acc :=
+    it.stepH _ (match · with
+      | .yield it' _ _ => go it' (acc + 1)
+      | .skip it' _ => go it' acc
+      | .done _ => return acc)
+  termination_by it.terminationByFinite
+
+@[specialize]
+def Iter.countM {m : Type → Type w'} [Monad m] {α : Type u} {β : Type v} {_ : Iterator α m β} [Finite α m] {_ : ComputableSmall.{0} α}
+    (it : Iter (α := α) m β) : m Nat :=
+  go it 0
+where
+  go [Finite α m] it acc := do
+    it.stepH _ (match · with
+      | .yield it' _ _ => go it' (acc + 1)
+      | .skip it' _ => go it' acc
+      | .done _ => return acc)
+  termination_by it.terminationByFinite
+
 @[inline]
 def Iter.toArrayH {α : Type u} {m : Type w → Type w'} [Monad m] {β : Type v}
     {_ : Iterator α m β} [Finite α m] {_ : ComputableSmall.{w} α} [ComputableUnivLE.{v, w}] (it : Iter (α := α) m β) : CodensityT m (Array β) :=

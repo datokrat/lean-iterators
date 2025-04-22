@@ -6,6 +6,20 @@ Authors: Paul Reichert
 import Iterator
 import Std.Time
 
+section Primes
+
+def oneToInfinity := Iter.unfold Id 1 (· + 1)
+
+def isPrime (n : Nat) : Bool := (oneToInfinity.take n |>.filter (n % · = 0)).count == 2
+
+def primesUntil n := oneToInfinity.take n |>.filter isPrime
+
+/-- info: [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3), (6, 3), (7, 4), (8, 4), (9, 4), (10, 4)] -/
+#guard_msgs in
+#eval oneToInfinity.map (fun n => (n, (primesUntil n).count)) |>.take 10 |>.toList
+
+end Primes
+
 def hideEggs : IO Unit := do
   -- Repeat colors and locations indefinitely
   let colors := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n =>

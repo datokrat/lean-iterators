@@ -46,12 +46,33 @@ def CodensityT.bindH {β : Type u} {γ : Type u'} (x : CodensityT m β) (f : β 
 def CodensityT.eval [Bind m] {α : Type w} (x : m α) : CodensityT m α :=
   fun _ h => x >>= h
 
-instance : Pure (CodensityT m) where
-  pure x _ h := h x
-
 instance : Monad (CodensityT m) where
   pure x _ h := h x
   bind x f _ h := x _ (f · _ h)
+
+protected theorem CodensityT.map_eq_mapH {β : Type u} {γ : Type u} (f : β → γ) (x : CodensityT m β) :
+    f <$> x = x.mapH f :=
+  rfl
+
+@[simp]
+protected theorem CodensityT.mapH_pure {β : Type u} {γ : Type u'} (f : β → γ) (x : β) :
+    (pure x : CodensityT m β).mapH f = pure (f x) :=
+  rfl
+
+protected theorem CodensityT.mapH_bindH {β : Type u} {γ : Type u'} {x : CodensityT m β} {f : β → CodensityT m γ}
+    {δ : Type u''} {g : γ → δ} :
+    (x.bindH f |>.mapH g) = x.bindH (f · |>.mapH g) :=
+  rfl
+
+protected theorem CodensityT.map_bindH {β : Type u} {γ : Type u'} {x : CodensityT m β} {f : β → CodensityT m γ}
+    {δ : Type u'} {g : γ → δ} :
+    g <$> (x.bindH f) = x.bindH (g <$> f ·) :=
+  rfl
+
+protected theorem CodensityT.mapH_mapH {β : Type u} {γ : Type u'} {x : CodensityT m β} {f : β → γ}
+    {δ : Type u''} {g : γ → δ} :
+    (x.mapH f |>.mapH g) = x.mapH (f · |> g) :=
+  rfl
 
 instance [Monad m] : MonadLift m (CodensityT m) where
   monadLift x _ f := x >>= f

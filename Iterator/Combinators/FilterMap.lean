@@ -226,7 +226,7 @@ end FilterMap
 
 section FilterMapM
 
-variable {m : Type w → Type w} {α : Type u} {β : Type v} {γ : Type w} {f : β → Option γ}
+variable {m : Type w → Type w'} {α : Type u} {β : Type v} {γ : Type w} {f : β → Option γ}
 
 @[inline]
 def Iter.filterMapM {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [Monad m] (f : β → m (Option γ)) (it : Iter (α := α) m β) :=

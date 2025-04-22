@@ -22,6 +22,9 @@ instance : Monad (IterationT m) where
                   let a ← (f b).computation
                   return ⟨a.1, b.1, a.2, b.2⟩ }
 
+theorem IterationT.computation_pure {m : Type w → Type w'} {γ : Type u} {a : γ} :
+    (pure a : IterationT m γ).computation = pure ⟨a, rfl⟩ := rfl
+
 instance (m) [Monad m] : MonadLift m (IterationT m) where
   monadLift t := { property := fun _ => True, computation := (⟨·, True.intro⟩) <$> t }
 
@@ -178,5 +181,19 @@ theorem property_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v}
   · exact Or.inl ⟨_, _, ‹_›, h⟩
   · exact Or.inr <| Or.inl ⟨_, ‹_›, h⟩
   · exact Or.inr <| Or.inr ⟨‹_›, h⟩
+
+theorem computation_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
+    [Monad m] [Iterator α m β]
+    {it : α} {yield skip done} :
+    (matchStepH (m := m) (γ := γ) it yield skip done).computation =
+      (IterationT.step m it).computation.bindH (match · with
+        | ⟨.yield it' out h, h'⟩ => (yield it' out).computation.mapH (fun y => ⟨y.1, .yield it' out h, y.2, h'⟩)
+        | ⟨.skip it' h, h'⟩ => (skip it').computation.mapH (fun y => ⟨y.1, .skip it' h, y.2, h'⟩)
+        | ⟨.done h, h'⟩ => done.computation.mapH (fun y => ⟨y.1, .done h, y.2, h'⟩)) := by
+  simp only [matchStepH, IterationT.bindH]
+  refine congrArg (fun x => (IterationT.step m it).computation.bindH x) ?_
+  ext x; cases x
+  dsimp only
+  split <;> dsimp only
 
 end SimpleIterator
