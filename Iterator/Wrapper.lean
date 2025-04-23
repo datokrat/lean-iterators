@@ -27,32 +27,50 @@ theorem inner_toIter {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : �
     (toIter m it).inner = it :=
   ComputableSmall.down_up
 
-inductive Iter.Step {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) where
-| yield : (it' : Iter (α := α) m β) → (b : β) → Iterator.yielded m it.inner it'.inner b → it.Step
-| skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.Step
-| done : Iterator.done m it.inner → it.Step
+def Iter.Step {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) :=
+  PlausibleIterStep (α := Iter (α := α) m β)
+    (fun step => Iterator.plausible_step m it.inner <| step.map Iter.inner id)
 
-inductive Iter.LiftedStep {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
-    (it : Iter (α := α) m β) where
-| yield : (it' : Iter (α := α) m β) → (b : ComputableSmall.Lift.{w} β) → Iterator.yielded m it.inner it'.inner (ComputableSmall.down b) → it.LiftedStep
-| skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.LiftedStep
-| done : Iterator.done m it.inner → it.LiftedStep
+-- inductive Iter.Step {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) where
+-- | yield : (it' : Iter (α := α) m β) → (b : β) → Iterator.yielded m it.inner it'.inner b → it.Step
+-- | skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.Step
+-- | done : Iterator.done m it.inner → it.Step
+
+def Iter.LiftedStep {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
+   (it : Iter (α := α) m β) : Type w :=
+  PlausibleIterStep (α := Iter (α := α) m β)
+    (fun step => Iterator.plausible_step m it.inner <| step.map Iter.inner ComputableSmall.down)
+
+-- inductive Iter.LiftedStep {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
+--     (it : Iter (α := α) m β) where
+-- | yield : (it' : Iter (α := α) m β) → (b : ComputableSmall.Lift.{w} β) → Iterator.yielded m it.inner it'.inner (ComputableSmall.down b) → it.LiftedStep
+-- | skip : (it' : Iter (α := α) m β) → Iterator.skipped m it.inner it'.inner → it.LiftedStep
+-- | done : Iterator.done m it.inner → it.LiftedStep
 
 @[always_inline, inline]
 def Iter.Step.lift {_ : Iterator α m β} {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
     (it : Iter (α := α) m β) (step : it.Step) : it.LiftedStep :=
-  match step with
-  | .yield it' b h => .yield it' (ComputableSmall.up b) (by simp [ComputableSmall.down_up, h])
-  | .skip it' h => .skip it' h
-  | .done h => .done h
+  step.map id ComputableSmall.up _
+    (by intro _ h; simp only [IterStep.map_map, ComputableSmall.down_up]; exact h)
+  -- match step with
+  -- | .yield it' b h => .yield it' (ComputableSmall.up b) (by simp [ComputableSmall.down_up, h])
+  -- | .skip it' h => .skip it' h
+  -- | .done h => .done h
 
 @[always_inline, inline]
-def Iter.Step.ofInternal {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) (step : IterStep.for m it.inner) :
+def Iter.Step.ofInternal {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) (step : PlausibleIterStep.for m it.inner) :
     it.Step :=
-  match step with
-  | .yield it' b h => .yield (toIter m it') b (by simp only [inner_toIter, h])
-  | .skip it' h => .skip (toIter m it') (by simp only [inner_toIter, h])
-  | .done h => .done h
+  step.map  (toIter m) id _
+    (by intro _ h; simp only [IterStep.map_map, inner_toIter]; exact IterStep.map_id ▸ h)
+  -- match step with
+  -- | .yield it' b h => .yield (toIter m it') b (by simp only [inner_toIter, h])
+  -- | .skip it' h => .skip (toIter m it') (by simp only [inner_toIter, h])
+  -- | .done h => .done h
+
+@[always_inline, inline]
+def Iter.Step.toInternal {_ : Iterator α m β} {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β) (step : it.Step) :
+    PlausibleIterStep.for m it.inner :=
+  step.map Iter.inner id _ (by simp)
 
 -- instance {m} [Functor m] [Iterator α m β] : Iterator (Iter (α := α) m β) m β where
 --   yielded it it' b := Iterator.yielded m it.inner it'.inner b

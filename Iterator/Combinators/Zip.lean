@@ -25,14 +25,14 @@ instance [Iterator α₁ m β₁] [Iterator α₂ m β₂] [Monad m] :
     match it.memoizedLeft with
     | none =>
       matchStepH it.left
-        (fun it₁' b₁ => pure <| .skip ⟨it₁', some b₁, it.right⟩ ⟨⟩)
-        (fun it₁' => pure <| .skip ⟨it₁', none, it.right⟩ ⟨⟩)
-        (pure <| .done ⟨⟩)
+        (fun it₁' b₁ => pure <| .skip ⟨it₁', some b₁, it.right⟩)
+        (fun it₁' => pure <| .skip ⟨it₁', none, it.right⟩)
+        (pure <| .done)
     | some b₁ =>
       matchStepH it.right
-        (fun it₂' b₂ => pure <| .yield ⟨it.left, none, it₂'⟩ (b₁, b₂) ⟨⟩)
-        (fun it₂' => pure <| .skip ⟨it.left, some b₁, it₂'⟩ ⟨⟩)
-        (pure <| .done ⟨⟩)
+        (fun it₂' b₂ => pure <| .yield ⟨it.left, none, it₂'⟩ (b₁, b₂))
+        (fun it₂' => pure <| .skip ⟨it.left, some b₁, it₂'⟩)
+        (pure <| .done)
 
 @[inline]
 def Iter.zipH [Monad m] [ComputableUnivLE.{max u₁ u₂ v₁, w}]

@@ -19,10 +19,10 @@ structure Drop (α : Type u) where
 instance [Monad m] [Iterator α m β] : SimpleIterator (Drop α) m β where
   step it := matchStep (m := m) it.inner
       (fun it' b => match it.remaining with
-        | 0 => pure <| .yield ⟨0, it'⟩ b ⟨⟩
-        | remaining' + 1 => pure <| .skip ⟨remaining', it'⟩ ⟨⟩)
-      (fun it' => pure <| .skip ⟨it.remaining, it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
+        | 0 => pure <| .yield ⟨0, it'⟩ b
+        | remaining' + 1 => pure <| .skip ⟨remaining', it'⟩)
+      (fun it' => pure <| .skip ⟨it.remaining, it'⟩)
+      (pure <| .done)
 
 /--
 Given an iterator `it` and a natural number `n`, `it.drop n` is an iterator that forwards all of

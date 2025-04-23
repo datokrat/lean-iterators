@@ -36,6 +36,27 @@ variable {α : Type u} {m : Type w → Type w'} {β : Type v}
   [Monad m] [LawfulMonad m]
   (f : β → CodensityT m (Option β'))
 
+theorem filterMapMH_step' (it : α) (f : β → IterationT m (Option β')) :
+    Iterator.step (m := m) (Iterator.filterMapMH f it) =
+      (Iterator.step (m := m) it |>.bindH (match · with
+        | .yield it' out h => (f out).computation.mapH (fun x => ⟨match x.val with
+          | none => .skip ⟨it'⟩
+          | some out => .yield ⟨it'⟩ out, .yield it' out, ⟨x.1, rfl, x.2⟩, h⟩)
+        | .skip it' h => pure ⟨.skip ⟨it'⟩, .skip it', rfl, h⟩
+        | .done h => pure ⟨.done, .done, rfl, h⟩)) := by
+  simp [Iterator.filterMapMH, Iterator.step, SimpleIterator.step, computation_matchStepH,
+    IterationT.step, IterationT.mapH, CodensityT.mapH_mapH, IterationT.computation_pure]
+  refine congrArg (CodensityT.bindH _) ?_
+  ext x
+  split
+  · simp
+    refine congrArg (CodensityT.mapH · _) ?_
+    ext y
+    cases y
+    dsimp only
+    split <;> rfl
+  · simp
+
 theorem filterMapMH_step :
   (it.filterMapMH f).stepH = (it.stepH.bindH (match · with
       | .yield it' out h => (f out).mapH fun
@@ -43,7 +64,15 @@ theorem filterMapMH_step :
           | _ => sorry
       | .skip it' h => pure <| .skip (it'.filterMapMH f) sorry
       | .done h => pure <| .done sorry)) := by
-  simp [Iter.stepH, Iterator.step, SimpleIterator.step]
+  simp [Iter.filterMapMH, Iter.stepH]
+  simp [toIter, Iter.inner]
+  rw [Iterator.step_congr <| ComputableSmall.down_up ..]
+  rw [filterMapMH_step']
+  simp [CodensityT.map_eq_mapH, CodensityT.mapH_mapH]
+  simp [Iter.Step.ofInternal.eq_def, PlausibleIterStep.map_map]
+  rw [Iterator.filterMapMH]
+  simp [Iter.stepH, Iterator.step, SimpleIterator.step, Iter.Step.ofInternal]
+
   simp [Iter.stepH, Iterator.step, SimpleIterator.step, CodensityT.map_eq_mapH, CodensityT.mapH_mapH, Iter.Step.ofInternal]
 
   simp [CodensityT]

@@ -47,10 +47,10 @@ instance : SimpleIterator (FilterMapMH α f) m γ where
     matchStepH (m := m) it.inner
       (fun it' b => IterationT.mapH
         (match · with
-          | none => .skip ⟨it'⟩ ⟨⟩
-          | some c => .yield ⟨it'⟩ c ⟨⟩) (f b))
-      (fun it' => pure <| .skip ⟨it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
+          | none => .skip ⟨it'⟩
+          | some c => .yield ⟨it'⟩ c) (f b))
+      (fun it' => pure <| .skip ⟨it'⟩)
+      (pure <| .done)
 
 instance {f : β → IterationT m γ} : SimpleIterator (MapMH α f) m γ :=
   inferInstanceAs <| SimpleIterator (FilterMapMH α _) m γ

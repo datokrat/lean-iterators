@@ -83,19 +83,19 @@ def FlatMap.init (it : α) (f : β → α₂) : FlatMap α f :=
 variable (m f) in
 @[always_inline, inline]
 def flatMapStepNone [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : α) :
-    IterationT m (RawStep (FlatMap α f) γ) :=
+    IterationT m (IterStep (FlatMap α f) γ) :=
   matchStepH it₁
-    (fun it₁' b => pure <| .skip ⟨it₁', some (f b)⟩ ⟨⟩)
-    (fun it₁' => pure <| .skip ⟨it₁', none⟩ ⟨⟩)
-    (pure <| .done ⟨⟩)
+    (fun it₁' b => pure <| .skip ⟨it₁', some (f b)⟩)
+    (fun it₁' => pure <| .skip ⟨it₁', none⟩)
+    (pure <| .done)
 
 variable (m f) in
 @[always_inline, inline]
 def flatMapStepSome [Monad m] [Iterator α m β] [Iterator α₂ m γ] (it₁ : α) (it₂ : α₂) :
-    IterationT m (RawStep (FlatMap α f) γ) :=
+    IterationT m (IterStep (FlatMap α f) γ) :=
   matchStepH it₂
-    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ b ⟨⟩)
-    (fun it₂' => pure <| .skip ⟨it₁, some it₂'⟩ ⟨⟩)
+    (fun it₂' b => pure <| .yield ⟨it₁, some it₂'⟩ b)
+    (fun it₂' => pure <| .skip ⟨it₁, some it₂'⟩)
     (flatMapStepNone m f it₁)
 
 -- TODO: avoid duplication of matching on it₁, which will produce bloated code
@@ -205,9 +205,9 @@ instance {β : Type v} {α : β → Type u'} [Monad m] [∀ b, Iterator (α b) m
     SimpleIterator (SigmaIterator α) m γ where
   step it := by
     exact matchStepH it.inner
-      (fun it' c => pure <| .yield ⟨it.b, it'⟩ c ⟨⟩)
-      (fun it' => pure <| .skip ⟨it.b, it'⟩ ⟨⟩)
-      (pure <| .done ⟨⟩)
+      (fun it' c => pure <| .yield ⟨it.b, it'⟩ c)
+      (fun it' => pure <| .skip ⟨it.b, it'⟩)
+      (pure <| .done)
 
 def SigmaIterator.lex (r : (b : β) → α b → α b → Prop) :
     SigmaIterator α → SigmaIterator α → Prop :=

@@ -6,10 +6,9 @@ Authors: Paul Reichert
 prelude
 import Init.Core
 import Init.Classical
-import Init.Ext
 import Init.NotationExtra
 import Init.TacticsExtra
-import Iterator.Cont
+import Iterator.IterationT
 import Iterator.UnivLE
 
 /-!
@@ -107,53 +106,103 @@ changes are necessary, this disclaimer will be removed.
 
 variable {α : Type u} {β : Type v}
 
-inductive IterStep (α β) (yielded : α → β → Prop) (skipped : α → Prop) (finished : Prop) where
-| yield : (it : α) → (b : β) → yielded it b → IterStep α β yielded skipped finished
-| skip : (a : α) → skipped a → IterStep α β yielded skipped finished
-| done : finished → IterStep α β yielded skipped finished
+inductive IterStep (α β) where
+| yield : (it : α) → (b : β) → IterStep α β
+| skip : (a : α) → IterStep α β
+| done : IterStep α β
 
-abbrev RawStep (α β) := IterStep α β (fun _ _ => True) (fun _ => True) True
-
-def IterStep.successor {yp sp fp} : IterStep α β yp sp fp → Option α
-  | .yield it _ _ => some it
-  | .skip it _ => some it
-  | .done _ => none
-
-class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  yielded : α → α → β → Prop
-  skipped : α → α → Prop
-  done : α → Prop
-  step : (it : α) → CodensityT m (IterStep α β (yielded it) (skipped it) (done it))
-
-abbrev IterStep.for {α β} (m) [Iterator α m β] (it : α) :=
-  IterStep α β (Iterator.yielded m it) (Iterator.skipped m it) (Iterator.done m it)
-
-abbrev IterStep.liftedFor {α β} (m) [Iterator α m β] (it : α) [ComputableSmall.{w} α] [ComputableSmall.{w} β] : Type w :=
-  IterStep (ComputableSmall.Lift α) (ComputableSmall.Lift β)
-    (fun it' b => Iterator.yielded m it (ComputableSmall.down it') (ComputableSmall.down b))
-    (fun it' => Iterator.skipped m it (ComputableSmall.down it')) (Iterator.done m it)
+def IterStep.successor : IterStep α β → Option α
+  | .yield it _ => some it
+  | .skip it => some it
+  | .done => none
 
 @[always_inline, inline]
-def IterStep.up {α β m} [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
-    {it : α} (step : IterStep.for m it) : IterStep.liftedFor m it :=
+def IterStep.map {α' : Type u'} {β' : Type v'} (f : α → α') (g : β → β') : IterStep α β → IterStep α' β'
+  | .yield it out => .yield (f it) (g out)
+  | .skip it => .skip (f it)
+  | .done => .done
+
+theorem IterStep.map_id {it : IterStep α β} :
+    it.map id id = it := by
+  simp only [map]
+  cases it <;> simp
+
+theorem IterStep.map_map {α' : Type u'} {β' : Type v'} {f : α → α'} {g : β → β'}
+    {α'' : Type u''} {β'' : Type v''} {f' : α' → α''} {g' : β' → β''} {it : IterStep α β} :
+    (it.map f g).map f' g' = it.map (f · |> f') (g · |> g') := by
+  simp only [map]
+  cases it <;> simp
+
+def PlausibleIterStep (plausible_step : IterStep α β → Prop) := Subtype plausible_step
+
+@[match_pattern]
+def PlausibleIterStep.yield {plausible_step : IterStep α β → Prop}
+    (it' : α) (out : β) (h : plausible_step (.yield it' out)) : PlausibleIterStep plausible_step :=
+  ⟨.yield it' out, h⟩
+
+@[match_pattern]
+def PlausibleIterStep.skip {plausible_step : IterStep α β → Prop}
+    (it' : α) (h : plausible_step (.skip it')) : PlausibleIterStep plausible_step :=
+  ⟨.skip it', h⟩
+
+@[match_pattern]
+def PlausibleIterStep.done {plausible_step : IterStep α β → Prop}
+    (h : plausible_step .done) : PlausibleIterStep plausible_step :=
+  ⟨.done, h⟩
+
+def PlausibleIterStep.successor (plausible_step : IterStep α β → Prop)
+    (step : PlausibleIterStep plausible_step) : Option α :=
+  step.val.successor
+
+@[always_inline, inline]
+def PlausibleIterStep.map {plausible_step : IterStep α β → Prop}
+    {α' : Type u'} {β' : Type v'} (f : α → α') (g : β → β') (new_plausible_step : IterStep α' β' → Prop)
+    (h : ∀ step : IterStep α β, plausible_step step → new_plausible_step (step.map f g))
+    (step : PlausibleIterStep plausible_step) : PlausibleIterStep new_plausible_step :=
+  ⟨step.val.map f g, h _ step.property⟩
+
+theorem PlausibleIterStep.map_id {plausible_step : IterStep α β → Prop}
+    {it : PlausibleIterStep plausible_step} :
+    it.map id id plausible_step (by simp [IterStep.map_id]) = it := by
+  simp only [map, IterStep.map]
+  cases it <;> dsimp only <;> split <;> simp
+
+-- theorem PlausiblerIterStep.map_map {α' : Type u'} {β' : Type v'} {f : α → α'} {g : β → β'}
+--     {plausible_step : IterStep α β → Prop}
+--     {plausible_step' : IterStep α' β' → Prop}
+--     {plausible_step'' : IterStep α'' β'' → Prop} {h h'}
+--     {α'' : Type u''} {β'' : Type v''} {f' : α' → α''} {g' : β' → β''} {it : PlausibleIterStep plausible_step} :
+--     (it.map f g plausible_step' h).map f' g' plausible_step'' h' =
+--       sorry := --it.map (f · |> f') (g · |> g') plausible_step'' sorry := by
+--   sorry
+--   -- simp only [map]
+--   -- cases it <;> simp
+
+class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
+  stepInternal : IterationT m (IterStep α β)
+
+abbrev PlausibleIterStep.for {α β} (m) [Iterator α m β] (it : α) :=
+  PlausibleIterStep (Iterator.plausible_step m it)
+
+abbrev PlausibleIterStep.liftedFor {α β} (m) [Iterator α m β] (it : α) [ComputableSmall.{w} α] [ComputableSmall.{w} β] : Type w :=
+  PlausibleIterStep
+    (fun step => Iterator.plausible_step m it <| step.map ComputableSmall.down ComputableSmall.down)
+
+@[always_inline, inline]
+def PlausibleIterStep.up {α β m} [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
+    {it : α} (step : PlausibleIterStep.for m it) : PlausibleIterStep.liftedFor m it :=
   match step with
-  | .yield it' b h => .yield (ComputableSmall.up it') (ComputableSmall.up b) (by simp [ComputableSmall.down_up, h])
-  | .skip it' h => .skip (ComputableSmall.up it') (by simp [ComputableSmall.down_up, h])
+  | .yield it' b h => .yield (ComputableSmall.up it') (ComputableSmall.up b) (by simp [IterStep.map, ComputableSmall.down_up, h])
+  | .skip it' h => .skip (ComputableSmall.up it') (by simp [IterStep.map, ComputableSmall.down_up, h])
   | .done h => .done h
 
 @[always_inline, inline]
-def IterStep.down {α β m} [Iterator α m β] {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} β} {it : α} (step : IterStep.liftedFor m it) : IterStep.for m it :=
+def PlausibleIterStep.down {α β m} [Iterator α m β] {_ : ComputableSmall.{w} α} {_ : ComputableSmall.{w} β} {it : α}
+    (step : PlausibleIterStep.liftedFor m it) : PlausibleIterStep.for m it :=
   match step with
   | .yield it' b h => .yield (ComputableSmall.down it') (ComputableSmall.down b) h
   | .skip it' h => .skip (ComputableSmall.down it') h
   | .done h => .done h
-
-@[always_inline, inline]
-def IterStep.raw {α β y s f} (step : IterStep α β y s f) : RawStep α β :=
-  match step with
-  | .yield it' b _ => .yield it' b ⟨⟩
-  | .skip it' _ => .skip it' ⟨⟩
-  | .done _ => .done ⟨⟩
 
 section Finite
 
@@ -161,7 +210,8 @@ structure FiniteIteratorWF (α m) [Iterator α m β] where
   inner : α
 
 def FiniteIteratorWF.lt {α m β} [Iterator α m β] (x y : FiniteIteratorWF α m) : Prop :=
-  (∃ b, Iterator.yielded m y.inner x.inner b) ∨ Iterator.skipped m y.inner x.inner
+  (∃ b, Iterator.plausible_step m y.inner (.yield x.inner b)) ∨
+    Iterator.plausible_step m y.inner (.skip x.inner)
 
 def finiteIteratorWF {α m β} [Iterator α m β] (it : α) : FiniteIteratorWF α m :=
   ⟨it⟩
@@ -183,7 +233,7 @@ structure ProductiveIteratorWF (α m) [Iterator α m β] where
   inner : α
 
 def ProductiveIteratorWF.lt {α m β} [Iterator α m β] (x y : ProductiveIteratorWF α m) : Prop :=
-  Iterator.skipped m y.inner x.inner
+  Iterator.plausible_step m y.inner (.skip x.inner)
 
 def productiveIteratorWF {α m β} [Iterator α m β] (it : α) : ProductiveIteratorWF α m :=
   ⟨it⟩

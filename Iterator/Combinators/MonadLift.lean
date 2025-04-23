@@ -16,12 +16,10 @@ instance [i : ComputableSmall.{w} α] : ComputableSmall.{w} (MonadLiftIterator �
   i.equiv MonadLiftIterator.mk MonadLiftIterator.inner rfl rfl
 
 instance : Iterator (MonadLiftIterator α m n) n β where
-  yielded it it' b := Iterator.yielded m it.inner it'.inner b
-  skipped it it' := Iterator.skipped m it.inner it'.inner
-  done it := Iterator.done m it.inner
+  plausible_step it step := Iterator.plausible_step m it.inner (step.map MonadLiftIterator.inner id)
   step it := do
-    let liftedStep : CodensityT n (IterStep.liftedFor m it.inner) := Iterator.step (m := m) it.inner |>.mapH IterStep.up |>.run
-    match ← liftedStep |>.mapH IterStep.down with
+    let liftedStep : CodensityT n (PlausibleIterStep.liftedFor m it.inner) := Iterator.step (m := m) it.inner |>.mapH PlausibleIterStep.up |>.run
+    match ← liftedStep |>.mapH PlausibleIterStep.down with
     | .yield it' b h => pure <| .yield ⟨it'⟩ b h
     | .skip it' h => pure <| .skip ⟨it'⟩ h
     | .done h => pure <| .done h

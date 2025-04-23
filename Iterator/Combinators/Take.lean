@@ -20,12 +20,12 @@ structure Take (α : Type u) where
 instance [Monad m] [Iterator α m β] : SimpleIterator (Take α) m β where
   step it :=
     match it with
-    | { remaining := 0, inner := _ } => pure <| .done ⟨⟩
+    | { remaining := 0, inner := _ } => pure <| .done
     | { remaining := remaining' + 1, inner := it } =>
       matchStep (m := m) it
-        (fun it' b => pure <| .yield ⟨remaining', it'⟩ b ⟨⟩)
-        (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩ ⟨⟩)
-        (pure <| .done ⟨⟩)
+        (fun it' b => pure <| .yield ⟨remaining', it'⟩ b)
+        (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩)
+        (pure <| .done)
 
 /--
 Given an iterator `it` and a natural number `n`, `it.take n` is an iterator that outputs
