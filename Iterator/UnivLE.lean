@@ -47,6 +47,10 @@ class ComputableSmall.{v, u} (α : Type u) where
   up_down : ∀ {a}, up (down a) = a
   down_up : ∀ {a}, down (up a) = a
 
+@[always_inline, inline]
+def ComputableSmall.Lift.down {α : Type u} [ComputableSmall α] : ComputableSmall.Lift α → α :=
+  ComputableSmall.down
+
 instance [ComputableUnivLE.{u, v}] {α} : ComputableSmall.{v, u} α where
   Lift := ComputableUnivLE.Lift α
   up := ComputableUnivLE.up

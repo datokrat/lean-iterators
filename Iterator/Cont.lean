@@ -38,9 +38,19 @@ def CodensityT.run [Pure m] {α : Type w} (x : CodensityT m α) := x _ pure
 def CodensityT.mapH {β : Type u} {γ : Type u'} (f : β → γ) (x : CodensityT m β) : CodensityT m γ :=
   fun _ h => x _ (h ∘ f)
 
+theorem CodensityT.mapH_id {β : Type u} {x : CodensityT m β} :
+    x.mapH id = x := rfl
+
+theorem CodensityT.mapH_id' {β : Type u} {x : CodensityT m β} :
+    x.mapH (·) = x := rfl
+
 @[always_inline, inline]
 def CodensityT.bindH {β : Type u} {γ : Type u'} (x : CodensityT m β) (f : β → CodensityT m γ) : CodensityT m γ :=
   fun _ h => x _ (f · _ h)
+
+theorem CodensityT.bindH_assoc {β : Type u} {γ : Type u'} {δ : Type u''} {x : CodensityT m β}
+    {f : β → CodensityT m γ} {g : γ → CodensityT m δ} :
+    (x.bindH f).bindH g = x.bindH (f · |>.bindH g) := rfl
 
 @[always_inline, inline]
 def CodensityT.eval [Bind m] {α : Type w} (x : m α) : CodensityT m α :=
@@ -54,9 +64,17 @@ protected theorem CodensityT.map_eq_mapH {β : Type u} {γ : Type u} (f : β →
     f <$> x = x.mapH f :=
   rfl
 
+protected theorem CodensityT.mapH_eq_bindH {β : Type u} {γ : Type u'} (f : β → γ) (x : CodensityT m β) :
+    x.mapH f = x.bindH (pure <| f ·) := rfl
+
 @[simp]
 protected theorem CodensityT.mapH_pure {β : Type u} {γ : Type u'} (f : β → γ) (x : β) :
     (pure x : CodensityT m β).mapH f = pure (f x) :=
+  rfl
+
+@[simp]
+protected theorem CodensityT.bindH_pure {β : Type u} {γ : Type u'} (f : β → CodensityT m γ) (x : β) :
+    (pure x : CodensityT m β).bindH f = f x :=
   rfl
 
 protected theorem CodensityT.mapH_bindH {β : Type u} {γ : Type u'} {x : CodensityT m β} {f : β → CodensityT m γ}

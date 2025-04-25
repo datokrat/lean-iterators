@@ -16,39 +16,35 @@ structure ListIterator (α : Type u) where
   list : List α
 
 instance {α} : Iterator (ListIterator α) m α where
-  plausible_step it
-    | .yield it' a => it.list = a :: it'.list
-    | .skip _ => False
-    | .done => it.list = []
-  step
-    | { list := .nil } => pure <| .done rfl
-    | { list := x :: xs } => pure <| .yield { list := xs } x rfl
+  step it :=
+    (fun
+      | [] => .done
+      | x :: xs => .yield { list := xs } x) <$>
+    (pure it.list : IterationT m _)
 
 /--
 Returns a finite iterator for the given list.
 The iterator yields the elements of the list in order and then terminates.
 -/
-@[inline]
+@[always_inline, inline]
 def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id) [ComputableSmall.{w} α] :
     Iter (α := ListIterator α) m α :=
   toIter m { list := l }
+
+instance : FinitenessRelation (ListIterator α) m where
+  rel := InvImage WellFoundedRelation.rel ListIterator.list
+  wf := InvImage.wf _ WellFoundedRelation.wf
+  subrelation {it it'} h := by
+    simp_wf
+    simp only [Iterator.step, IterationT.map_eq_mapH, IterationT.mapH, Pure.pure] at h
+    obtain ⟨step, h, _, rfl, rfl⟩ := h
+    cases it
+    split at h <;> simp_all [IterStep.successor]
 
 -- TODO
 -- @[inline]
 -- def List.iterH {α : Type u} (l : List α) (m) [Pure m] : Iter (α := ListIterator α) m α :=
 --   toIter m { list := l }
-
-theorem ListIterator.subrelation :
-    Subrelation (FiniteIteratorWF.lt (α := ListIterator α) (m := m))
-      (InvImage WellFoundedRelation.rel (ListIterator.list ∘ FiniteIteratorWF.inner)) := by
-  intro x y hlt
-  simp_wf
-  simp only [FiniteIteratorWF.lt, Iterator.plausible_step, or_false] at hlt
-  cases hlt
-  simp_all
-
-instance : Finite (ListIterator α) m where
-  wf := ListIterator.subrelation.wf (InvImage.wf _ WellFoundedRelation.wf)
 
 end ListIterator
 
@@ -62,12 +58,7 @@ structure UnfoldIterator (α : Type u) (f : α → α) where
   next : α
 
 instance : Iterator (UnfoldIterator α f) m α where
-  plausible_step it
-    | .yield it' a => it.next = a ∧ it'.next = f a
-    | .skip _ => False
-    | .done => False
-  step
-    | ⟨a⟩ => pure <| .yield ⟨f a⟩ a ⟨rfl, rfl⟩
+  step it := pure <| .yield ⟨f it.next⟩ it.next
 
 /--
 Creates an infinite, productive iterator. First it yields `init`.
@@ -77,11 +68,9 @@ If the last step yielded `a`, the next will yield `f a`.
 def Iter.unfold (m : Type w → Type w' := by exact Id) {α : Type u} (init : α) (f : α → α) [ComputableUnivLE.{u, w}] :=
   toIter m <| UnfoldIterator.mk (f := f) init
 
-instance [Pure m] : Productive (UnfoldIterator α f) m where
-  wf := by
-    refine ⟨?_⟩
-    intro x
-    constructor
-    rintro _ ⟨⟩
+instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where
+  rel := emptyWf.rel
+  wf := emptyWf.wf
+  subrelation {it it'} h := by cases h
 
 end Unfold

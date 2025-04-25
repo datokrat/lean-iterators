@@ -5,7 +5,6 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Wrapper
-import Iterator.SimpleIterator
 
 /-!
 This file provides iterator combinators for filtering and mapping.
@@ -42,9 +41,9 @@ instance [i : ComputableSmall.{w} α] : ComputableSmall.{w} (FilterMapMH α f) :
 instance [i : ComputableSmall.{w} α] {f : β → IterationT m γ} : ComputableSmall.{w} (MapMH α f) :=
   instComputableSmallFilterMapMH
 
-instance : SimpleIterator (FilterMapMH α f) m γ where
+instance : Iterator (FilterMapMH α f) m γ where
   step it :=
-    matchStepH (m := m) it.inner
+    Iterator.step (m := m) it.inner |>.bindH <| matchStep
       (fun it' b => IterationT.mapH
         (match · with
           | none => .skip ⟨it'⟩
@@ -52,43 +51,50 @@ instance : SimpleIterator (FilterMapMH α f) m γ where
       (fun it' => pure <| .skip ⟨it'⟩)
       (pure <| .done)
 
-instance {f : β → IterationT m γ} : SimpleIterator (MapMH α f) m γ :=
-  inferInstanceAs <| SimpleIterator (FilterMapMH α _) m γ
+instance {f : β → IterationT m γ} : Iterator (MapMH α f) m γ :=
+  inferInstanceAs <| Iterator (FilterMapMH α _) m γ
 
--- TODO: This proof needs to use internals of IterationT instead of relying on successor_yield etc.
-instance [Finite α m] : SimpleIterator.Finite (FilterMapMH α f) m where
-  rel := InvImage FiniteIteratorWF.lt (finiteIteratorWF (m := m) ∘ FilterMapMH.inner)
+-- TODO: This proof needs to use internals of IterationT instead of relying on successor_yield
+instance [Finite α m] : FinitenessRelation (FilterMapMH α f) m where
+  rel := InvImage (Iterator.successor_of m) FilterMapMH.inner
   wf := InvImage.wf _ Finite.wf
   subrelation {it it'} h := by
-    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStepH h
-    · simp only [IterationT.mapH, Function.comp_apply] at h
+    simp only [Iterator.step] at h
+    match successor_matchStepH h with
+    | .yield hy h =>
+      simp only [IterationT.mapH, Function.comp_apply] at h
       obtain ⟨h, hb, a, rfl, h'⟩ := h
       split at hb
       · cases hb
-        apply Or.inl ⟨_, hy⟩
+        exact Iterator.successor_of_yield hy
       · cases hb
-        apply Or.inl ⟨_, hy⟩
-    · cases successor_skip.mp h
-      exact Or.inr hs
-    · cases successor_done.mp h
+        exact Iterator.successor_of_yield hy
+    | .skip hs h =>
+      cases successor_skip.mp h
+      exact Iterator.successor_of_skip hs
+    | .done hd h =>
+      cases successor_done.mp h
 
 instance {f : β → IterationT m γ} [Finite α m] : Finite (MapMH α f) m :=
   inferInstanceAs <| Finite (FilterMapMH α _) m
 
-instance {f : β → IterationT m γ} [Productive α m] : SimpleIterator.Productive (MapMH α f) m where
-  rel := InvImage ProductiveIteratorWF.lt (productiveIteratorWF (m := m) ∘ FilterMapMH.inner)
+instance {f : β → IterationT m γ} [Productive α m] : ProductivenessRelation (MapMH α f) m where
+  rel := InvImage (Iterator.skip_successor_of m) FilterMapMH.inner
   wf := InvImage.wf _ Productive.wf
   subrelation {it it'} h := by
-    simp only [SimpleIterator.step] at h
-    obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := property_matchStepH h
-    · simp only [IterationT.mapH] at h
+    simp only [Iterator.step] at h
+    match property_matchStepH h with
+    | .yield hy h =>
+      simp only [IterationT.mapH] at h
       obtain ⟨c, h, h'⟩ := h
       split at h
       · simp [Functor.map] at h'
       · cases h
-    · cases h
+    | .skip hs h =>
+      cases h
       exact hs
-    · cases h
+    | .done hd h =>
+      cases h
 
 @[always_inline, inline]
 def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → IterationT m (Option γ)) (it : α) :
