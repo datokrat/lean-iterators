@@ -103,6 +103,7 @@ theorem IterationT.property_mapH {γ : Type u} {δ : Type u'} {m : Type w → Ty
     {x : γ} (f : γ → δ) (h : t.property x) : (t.mapH f).property (f x) :=
   ⟨x, rfl, h⟩
 
+@[always_inline, inline]
 def IterationT.Plausible.map {m : Type w → Type w'} {γ : Type u} {δ : Type u'}
     {t : IterationT m γ} (f : γ → δ) (x : t.Plausible) : (t.mapH f).Plausible :=
   ⟨f x.1, x.1, rfl, x.2⟩

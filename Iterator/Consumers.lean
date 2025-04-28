@@ -27,13 +27,13 @@ instance {m : Type w → Type w'} {n : Type w → Type w''} [Monad m] [Monad n] 
   forIn := Iter.forIn
 
 @[specialize]
-def Iter.fold {m : Type w → Type w'} {n : Type w → Type w'} [Monad m] [Monad n] [MonadLiftT m n]
+def Iter.foldM {m : Type w → Type w'} {n : Type w → Type w'} [Monad m] [Monad n] [MonadLiftT m n]
     {α : Type u} {β : Type v} {γ : Type w} {_ : Iterator α m β} [Finite α m] {_ : ComputableSmall.{w} α} [ComputableSmall.{w} β]
     (f : γ → β → n γ) (init : γ) (it : Iter (α := α) m β) : n γ := do
   let step : n it.LiftedStep := it.stepH.mapH (·.lift) |>.run
   match ← step with
-  | .yield it' b _ => it'.fold f (← f init (ComputableSmall.down b))
-  | .skip it' _ => it'.fold f init
+  | .yield it' b _ => it'.foldM f (← f init (ComputableSmall.down b))
+  | .skip it' _ => it'.foldM f init
   | .done _ => return init
 termination_by it.terminationByFinite
 

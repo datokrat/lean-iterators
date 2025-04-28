@@ -15,12 +15,45 @@ variable {m : Type w → Type w'}
 structure ListIterator (α : Type u) where
   list : List α
 
+-- instance {α} : Iterator (ListIterator α) m α where
+--   step it :=
+--     (fun
+--       | [] => .done
+--       | x :: xs => .yield { list := xs } x) <$>
+--     (pure it.list : IterationT m _)
+
+-- /--
+-- Returns a finite iterator for the given list.
+-- The iterator yields the elements of the list in order and then terminates.
+-- -/
+-- @[always_inline, inline]
+-- def List.iter {α : Type u} (l : List α) (m : Type u → Type w := by exact Id) [ComputableSmall.{w} α] :
+--     Iter (α := ListIterator α) m α :=
+--   toIter m { list := l }
+
+-- instance : FinitenessRelation (ListIterator α) m where
+--   rel := InvImage WellFoundedRelation.rel ListIterator.list
+--   wf := InvImage.wf _ WellFoundedRelation.wf
+--   subrelation {it it'} h := by
+--     simp_wf
+--     simp only [Iterator.step, IterationT.map_eq_mapH, IterationT.mapH, Pure.pure] at h
+--     obtain ⟨step, h, _, rfl, rfl⟩ := h
+--     cases it
+--     split at h <;> simp_all [IterStep.successor]
+
 instance {α} : Iterator (ListIterator α) m α where
   step it :=
-    (fun
-      | [] => .done
-      | x :: xs => .yield { list := xs } x) <$>
-    (pure it.list : IterationT m _)
+    { property
+        | .yield it' out => it.list = out :: it'.list
+        | .skip _ => False
+        | .done => it.list = []
+      computation := pure (match it.list with
+        | [] => ⟨.done, rfl⟩
+        | x :: xs => ⟨.yield ⟨xs⟩ x, rfl⟩) }
+    -- (fun
+    --   | [] => .done
+    --   | x :: xs => .yield { list := xs } x) <$>
+    -- (pure it.list : IterationT m _)
 
 /--
 Returns a finite iterator for the given list.
@@ -37,9 +70,8 @@ instance : FinitenessRelation (ListIterator α) m where
   subrelation {it it'} h := by
     simp_wf
     simp only [Iterator.step, IterationT.map_eq_mapH, IterationT.mapH, Pure.pure] at h
-    obtain ⟨step, h, _, rfl, rfl⟩ := h
-    cases it
-    split at h <;> simp_all [IterStep.successor]
+    obtain ⟨step, h, h'⟩ := h
+    cases step <;> simp_all [IterStep.successor]
 
 -- TODO
 -- @[inline]
