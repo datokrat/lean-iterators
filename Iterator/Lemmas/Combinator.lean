@@ -1,5 +1,5 @@
 import Iterator.Combinators.FilterMap
-import Iterator.Consumers
+import Iterator.Lemmas.Consumer
 
 variable {α : Type u} {m : Type w → Type w'} {β : Type v}
   [Iterator α m β] {_ : ComputableSmall.{w} α} (it : Iter (α := α) m β)
@@ -49,7 +49,7 @@ theorem FilterMapMH.plausible_of_done
   simp only [Iter.filterMapMH, Iterator.filterMapMH, inner_toIter]
   exact internalStep.property
 
-theorem filterMapMH_step :
+theorem filterMapMH_stepH :
   (it.filterMapMH f).stepH = (it.stepH.bindH (match · with
       | .yield it' out h => (f out).mapH fun
           | none => .skip (it'.filterMapMH f) (FilterMapMH.plausible_of_yield_of_none _ _ h)
@@ -92,6 +92,36 @@ theorem filterMapMH_step :
       IterationT.computation_pure, CodensityT.bindH_pure]
     rfl
 
--- TODO: Perhaps we should also carry the small instance around in Iter
-theorem toList_filterMapMH [Finite α m] [ComputableSmall β] :
-    (it.filterMapMH f).toList = it.foldM
+theorem filterMapH_stepH {f : β → Option β'} :
+    (it.filterMapH f).stepH = (it.stepH.mapH (match · with
+      | .yield it' out h => match f out with
+          | none => .skip (it'.filterMapH f) (FilterMapMH.plausible_of_yield_of_none _ _ h)
+          | some out' => .yield (it'.filterMapH f) out' (FilterMapMH.plausible_of_yield_of_some _ _ h)
+      | .skip it' h => .skip (it'.filterMapH f) (FilterMapMH.plausible_of_skip _ _ h)
+      | .done h => .done (FilterMapMH.plausible_of_done _ _ h))) := by
+  simp only [Iter.filterMapH, filterMapMH_stepH, CodensityT.mapH_eq_bindH]
+  refine congrArg it.stepH.bindH ?_
+  ext step
+  split <;> rfl
+
+theorem filterMapH_step {α : Type u} {m : Type w → Type w'} [Monad m] {β : Type w} {f : β → Option β'}
+    {_ : Iterator α m β} {_ : ComputableSmall α} {it : Iter (α := α) m β} :
+    (it.filterMapH f).step = (match · with
+      | .yield it' out h => match f out with
+          | none => .skip (it'.filterMapH f) (FilterMapMH.plausible_of_yield_of_none _ _ h)
+          | some out' => .yield (it'.filterMapH f) out' (FilterMapMH.plausible_of_yield_of_some _ _ h)
+      | .skip it' h => .skip (it'.filterMapH f) (FilterMapMH.plausible_of_skip _ _ h)
+      | .done h => .done (FilterMapMH.plausible_of_done _ _ h)) <$> it.step := by
+  simp only [Iter.filterMapH, filterMapMH_stepH, CodensityT.mapH_eq_bindH]
+  refine congrArg it.stepH.bindH ?_
+  ext step
+  split <;> rfl
+
+theorem toList_filterMapH {α : Type u} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
+    {_ : Iterator α m β} {_ : ComputableSmall α}
+    [Finite α m] {f : β → Option β'} (it : Iter (α := α) m β) :
+    (it.filterMapH f).toList = (fun x => x.filterMap f) <$> it.toList := by
+  induction it using Iter.induct
+  rename_i it ihy ihs
+  rw [Iter.toList_of_step, Iter.toList_of_step]
+  simp [filterMapH_step]
