@@ -8,7 +8,6 @@ import Init.Core
 import Init.Classical
 import Init.NotationExtra
 import Init.TacticsExtra
-import Iterator.IterationT
 import Iterator.UnivLE
 
 /-!
@@ -111,6 +110,24 @@ inductive IterStep (α β) where
 | skip : (a : α) → IterStep α β
 | done : IterStep α β
 
+instance [Small.{w} α] [Small.{w} β] : Small.{w} (IterStep α β) where
+  h := ⟨{
+    Target := IterStep (USquash α) (USquash β)
+    deflate x := match x with
+      | .yield it out => .yield (.deflate it) (.deflate out)
+      | .skip it => .skip (.deflate it)
+      | .done => .done
+    inflate x := match x with
+      | .yield it out => .yield it.inflate out.inflate
+      | .skip it => .skip it.inflate
+      | .done => .done
+    deflate_inflate {x} := by
+      dsimp only
+      cases x <;> simp
+    inflate_deflate {x} := by
+      dsimp only
+      cases x <;> simp }⟩
+
 def IterStep.successor : IterStep α β → Option α
   | .yield it _ => some it
   | .skip it => some it
@@ -142,6 +159,10 @@ theorem IterStep.successor_map {α' : Type u'} {β' : Type v'} {f : α → α'} 
   cases step <;> rfl
 
 def PlausibleIterStep (plausible_step : IterStep α β → Prop) := Subtype plausible_step
+
+instance (α : Type u) (β : Type v) [Small.{w} (IterStep α β)] {plausible_step : IterStep α β → Prop} :
+    Small.{w} (PlausibleIterStep plausible_step) :=
+  inferInstanceAs <| Small.{w} (Subtype plausible_step)
 
 @[match_pattern]
 def PlausibleIterStep.yield {plausible_step : IterStep α β → Prop}
@@ -186,8 +207,33 @@ theorem PlausibleIterStep.map_id {plausible_step : IterStep α β → Prop}
 --   -- simp only [map]
 --   -- cases it <;> simp
 
+/-
+Options:
+1. α : Type w; create a SmallIterator class. Problem of β remains!
+2. basically use the `OverT` construction in `Iterator` (2b: have `Iterator` be universe-uniform) and require both α and β to be small (in `Iter`). Sad: complicated signatures. Equality might become difficult to ensure.
+3. bundle smallness of α and β in `Iter`, let `Iterator` be universe-uniform. Problem: we rely heavily on optimizations.
+4. parametrize `step` over smallness instances
+5. `coherent_step`
+6. ULower-powered Prop-values UnivLE
+-/
 class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) where
-  step : α → IterationT m (IterStep α β)
+  state_small : Small.{w} α
+  value_small : Small.{w} β
+  plausible_step : α → IterStep α β → Prop
+  step : (it : α) → m (USquash <| PlausibleIterStep <| plausible_step it)
+
+instance (α : Type u) (m : Type w → Type w') (β : Type v) [Iterator α m β] (it : α) :
+    Small.{w} (PlausibleIterStep (Iterator.plausible_step m it)) :=
+  haveI := Iterator.state_small (α := α) m
+  haveI := Iterator.value_small (α := α) m
+  inferInstance
+
+def Iterator.plausible_successor {α : Type u} (m : Type w → Type w') {β : Type v}
+    [Iterator α m β] (it' it : α) : Prop :=
+  ∃ step : IterStep α β, step.successor = some it' ∧ Iterator.plausible_step m it step
+
+def Iterator.plausible_skip {α β} (m) [Iterator α m β] (x y : α) : Prop :=
+  Iterator.plausible_step m y (.skip x)
 
 -- abbrev PlausibleIterStep.for {α β} (m) [Iterator α m β] (it : α) :=
 --   PlausibleIterStep (Iterator.plausible_step m it)
@@ -214,31 +260,25 @@ class Iterator (α : Type u) (m : Type w → Type w') (β : outParam (Type v)) w
 
 section Finite
 
-def Iterator.successor_of {α β} (m) [Iterator α m β] (x y : α) : Prop :=
-  Iterator.step (m := m) y |>.mapH IterStep.successor |>.property (some x)
-  -- (∃ b, Iterator.plausible_step m y.inner (.yield x.inner b)) ∨
-  --   Iterator.plausible_step m y.inner (.skip x.inner)
-
 class Finite (α m) [Iterator α m β] : Prop where
-  wf : WellFounded (Iterator.successor_of (α := α) m)
+  wf : WellFounded (Iterator.plausible_successor (α := α) (m := m))
 
 theorem Iterator.successor_of_yield {α m β} [Iterator α m β] {x y : α} {out : β}
-    (h : Iterator.step (m := m) y |>.property (.yield x out)) : Iterator.successor_of m x y :=
+    (h : Iterator.plausible_step m x (.yield y out)) :
+    Iterator.plausible_successor (m := m) y x :=
   ⟨_, rfl, h⟩
 
 theorem Iterator.successor_of_skip {α m β} [Iterator α m β] {x y : α}
-    (h : Iterator.step (m := m) y |>.property (.skip x)) : Iterator.successor_of m x y :=
+    (h : Iterator.plausible_step m x (.skip y)) :
+    Iterator.plausible_successor (m := m) y x :=
   ⟨_, rfl, h⟩
 
 end Finite
 
 section Productive
 
-def Iterator.skip_successor_of {α β} (m) [Iterator α m β] (x y : α) : Prop :=
-  Iterator.step (m := m) y |>.property (.skip x)
-
 class Productive (α m) [Iterator α m β] : Prop where
-  wf : WellFounded (Iterator.skip_successor_of (α := α) m)
+  wf : WellFounded (Iterator.plausible_skip (α := α) m)
 
 end Productive
 
@@ -246,13 +286,13 @@ variable (α m) in
 class FinitenessRelation [Iterator α m β] where
   rel : α → α → Prop
   wf : WellFounded rel
-  subrelation : {it it' : α} → ((Iterator.step (m := m) it).mapH IterStep.successor).property (some it') → rel it' it
+  subrelation : {it it' : α} → Iterator.plausible_successor m it' it → rel it' it
 
 variable (α m) in
 class ProductivenessRelation [Iterator α m β] where
   rel : α → α → Prop
   wf : WellFounded rel
-  subrelation : {it it' : α} → (Iterator.step (m := m) it).property (.skip it') → rel it' it
+  subrelation : {it it' : α} → Iterator.plausible_skip m it' it → rel it' it
 
 instance [Iterator α m β] [FinitenessRelation α m] : Finite α m where
   wf := by
@@ -286,100 +326,53 @@ def matchStep {α β γ} (yield : α → β → γ) (skip : α → γ) (done : �
 --   | .skip it => skip it rfl
 --   | .done => done rfl
 
-theorem apply_matchStep {α β γ δ} (f : γ → δ) {yield : α → β → γ} {skip : α → γ} {done : γ} {step : IterStep α β} :
-    f (matchStep yield skip done step) = matchStep (yield · · |> f) (skip · |> f) (f done) step := by
-  cases step <;> rfl
+-- inductive MatchStepVerificationCases {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
+--     [Iterator α m β] (it : α) (yield : α → β → IterationT m γ) (skip : α → IterationT m γ)
+--     (done : IterationT m γ) (x : γ) : Prop where
+--   | yield {it' : α} {out : β} :
+--     Iterator.plausible_step m it (.yield it' out) →
+--     (yield it' out).property x → MatchStepVerificationCases it yield skip done x
+--   | skip {it' : α} :
+--     Iterator.plausible_step m it (.skip it') →
+--     (skip it').property x → MatchStepVerificationCases it yield skip done x
+--   | done :
+--     Iterator.plausible_step m it .done →
+--     done.property x → MatchStepVerificationCases it yield skip done x
 
-def matchStepComputation {m α β γ} (yield : α → β → IterationT m γ) (skip : α → IterationT m γ) (done : IterationT m γ) (step : IterStep α β) :
-    CodensityT m (matchStep yield skip done step).Plausible :=
-      match step with
-      | .yield it out => (yield it out).computation
-      | .skip it => (skip it).computation
-      | .done => done.computation
+-- theorem successor_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
+--     [Iterator α m β]
+--     {it : α} {yield skip done}
+--     {f : γ → δ} {x : δ}
+--     (h : (IterationT.mapH f <| (Iterator.step (m := m) it).bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
+--     MatchStepVerificationCases it (yield · · |>.mapH f) (skip · |>.mapH f) (done.mapH f) x := by
+--   simp only [IterationT.mapH, IterationT.bindH, matchStep] at h
+--   obtain ⟨c, rfl, _, h, h'⟩ := h
+--   split at h
+--   · exact .yield h' ⟨c, rfl, h⟩
+--   · exact .skip h' ⟨c, rfl, h⟩
+--   · exact .done h' ⟨c, rfl, h⟩
 
-def matchStepD {α β} {motive : IterStep α β → Type v}
-    (yield : (it : α) → (out : β) → motive (.yield it out))
-    (skip : (it : α) → motive (.skip it))
-    (done : motive .done) (step : IterStep α β) :
-    motive step :=
-      match step with
-      | .yield it out => (yield it out)
-      | .skip it => (skip it)
-      | .done => done
+-- theorem successor_yield [Pure m] [Iterator α m β] {it₁ it₂ : α} {b : β} :
+--     ((pure (.yield it₁ b) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
+--       it₂ = it₁ := by
+--   simp [IterationT.mapH, Pure.pure, IterStep.successor]
 
-def matchStepComputation' {m α β γ} (yield : α → β → IterationT m γ) (skip : α → IterationT m γ) (done : IterationT m γ) (step : IterStep α β) :
-    CodensityT m (matchStep yield skip done step).Plausible :=
-      matchStepD (motive := fun step => CodensityT m (matchStep yield skip done step |>.Plausible))
-        (yield · · |>.computation)
-        (skip · |>.computation)
-        done.computation
-        step
+-- theorem successor_skip [Pure m] [Iterator α m β] {it₁ it₂ : α} :
+--     ((pure (.skip it₁) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
+--       it₂ = it₁ := by
+--   simp [IterationT.mapH, Pure.pure, IterStep.successor]
 
-theorem computation_matchStep {m α β γ} {yield : α → β → IterationT m γ} {skip : α → IterationT m γ} {done : IterationT m γ} {step : IterStep α β} :
-    (matchStep yield skip done step).computation =
-      matchStepD (motive := fun step => CodensityT m (matchStep yield skip done step |>.Plausible))
-        (yield · · |>.computation)
-        (skip · |>.computation)
-        done.computation
-        step := by
-  cases step <;> rfl
+-- theorem successor_done [Pure m] [Iterator α m β] {it: α} :
+--     ((pure .done : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it) ↔ False := by
+--   simp [IterationT.mapH, Pure.pure, IterStep.successor]
 
-theorem apply_matchStepD {α β} {motive : IterStep α β → Type v}
-    {motive' : IterStep α β → Type v'}
-    (yield : (it : α) → (out : β) → motive (.yield it out))
-    (skip : (it : α) → motive (.skip it))
-    (done : motive .done) (step : IterStep α β)
-    {f : {step : IterStep α β} → motive step → motive' step} :
-    f (matchStepD yield skip done step) =
-      sorry := sorry
-
-inductive MatchStepVerificationCases {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
-    [Iterator α m β] (it : α) (yield : α → β → IterationT m γ) (skip : α → IterationT m γ)
-    (done : IterationT m γ) (x : γ) : Prop where
-  | yield {it' : α} {out : β} :
-    (Iterator.step (m := m) it).property (.yield it' out) →
-    (yield it' out).property x → MatchStepVerificationCases it yield skip done x
-  | skip {it' : α} :
-    (Iterator.step (m := m) it).property (.skip it') →
-    (skip it').property x → MatchStepVerificationCases it yield skip done x
-  | done :
-    (Iterator.step (m := m) it).property .done →
-    done.property x → MatchStepVerificationCases it yield skip done x
-
-theorem successor_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
-    [Iterator α m β]
-    {it : α} {yield skip done}
-    {f : γ → δ} {x : δ}
-    (h : (IterationT.mapH f <| (Iterator.step (m := m) it).bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
-    MatchStepVerificationCases it (yield · · |>.mapH f) (skip · |>.mapH f) (done.mapH f) x := by
-  simp only [IterationT.mapH, IterationT.bindH, matchStep] at h
-  obtain ⟨c, rfl, _, h, h'⟩ := h
-  split at h
-  · exact .yield h' ⟨c, rfl, h⟩
-  · exact .skip h' ⟨c, rfl, h⟩
-  · exact .done h' ⟨c, rfl, h⟩
-
-theorem successor_yield [Pure m] [Iterator α m β] {it₁ it₂ : α} {b : β} :
-    ((pure (.yield it₁ b) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
-      it₂ = it₁ := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
-theorem successor_skip [Pure m] [Iterator α m β] {it₁ it₂ : α} :
-    ((pure (.skip it₁) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
-      it₂ = it₁ := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
-theorem successor_done [Pure m] [Iterator α m β] {it: α} :
-    ((pure .done : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it) ↔ False := by
-  simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
-theorem property_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
-    [Iterator α m β] {it : α} {yield skip done} {x : γ}
-    (h : (Iterator.step (m := m) it |>.bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
-    MatchStepVerificationCases it yield skip done x := by
-  simp only [IterationT.bindH, matchStep] at h
-  obtain ⟨c, h, h'⟩ := h
-  split at h
-  · exact .yield h' h
-  · exact .skip h' h
-  · exact .done h' h
+-- theorem property_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
+--     [Iterator α m β] {it : α} {yield skip done} {x : γ}
+--     (h : (Iterator.step (m := m) it |>.bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
+--     MatchStepVerificationCases it yield skip done x := by
+--   simp only [IterationT.bindH, matchStep] at h
+--   obtain ⟨c, h, h'⟩ := h
+--   split at h
+--   · exact .yield h' h
+--   · exact .skip h' h
+--   · exact .done h' h
