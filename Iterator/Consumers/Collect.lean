@@ -1,18 +1,4 @@
-import Iterator.Wrapper
-
--- @[inline]
--- def Iter.toArrayH {α : Type u} {m : Type w → Type w'} [Monad m] {β : Type v}
---     {_ : Iterator α m β} [Finite α m] (it : Iter (α := α) m β) : m (Array β) :=
---   (CodensityT.eval <| go it #[]).mapH ComputableSmall.down
--- where
---   @[specialize]
---   go [Monad m] [Finite α m] it a : m (ComputableSmall.Lift.{w} (Array β)) := do
---     let step ← it.stepH.mapH (·.lift) |>.run
---     match step with
---       | .yield it' b _ => go it' (a.push <| ComputableSmall.down b)
---       | .skip it' _ => go it' a
---       | .done _ => return ComputableSmall.up a
---   termination_by it.terminationByFinite
+import Iterator.Basic
 
 section ToArray
 
@@ -27,7 +13,7 @@ where
     | .yield it' b _ => go it' (a.push (← f b))
     | .skip it' _ => go it' a
     | .done _ => return a
-  termination_by it.terminationByFinite
+  termination_by it.finitelyManySteps
 
 class IteratorToArray (α : Type u) (m : Type w → Type w') [Iterator α m β] where
   toArrayMapped : ∀ {γ : Type w}, (β → m γ) → Iter (α := α) m β → m (Array γ)
@@ -70,7 +56,7 @@ where
     | .yield it' b _ => go it' (b :: bs)
     | .skip it' _ => go it' bs
     | .done _ => return bs
-  termination_by it.terminationByFinite
+  termination_by it.finitelyManySteps
 
 @[inline]
 def Iter.toList {α : Type u} {m : Type v → Type w} [Monad m] {β : Type v}

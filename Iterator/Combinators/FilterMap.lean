@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.Wrapper
+import Iterator.Basic
 import Iterator.Consumers.Collect
 
 /-!
@@ -29,16 +29,11 @@ structure FilterMapMH (α : Type u) {β : Type v} {γ : Type v'} [Small.{w} γ]
     {m : Type w → Type w'} {p : Option γ → Prop} (f : β → m (USquash <| Subtype p)) where
   inner : α
 
-def MapMH (α : Type u) {β : Type v} {γ : Type v'} {m : Type w → Type w'} [Functor m]
-    [Small.{w} γ] {p : γ → Prop} (f : β → m (USquash <| Subtype p)) :=
-  FilterMapMH α (γ := γ) (p := fun x => ∃ y, x = some y ∧ p y)
-    (fun x => (USquash.deflate ∘ (fun y => ⟨some y.1, y.1, rfl, y.2⟩) ∘ USquash.inflate) <$> f x)
-
 variable {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type v'} [Small.{w} γ]
     [Monad m] [Iterator α m β] {p : Option γ → Prop} {f : β → m (USquash <| Subtype p)}
 
-instance : Small.{w} (FilterMapMH α f) where
-  h := haveI : Small.{w} α := Iterator.state_small m; ⟨{
+instance [Small.{w} α] : Small.{w} (FilterMapMH α f) where
+  h := ⟨{
     Target := USquash α
     deflate x := .deflate x.inner
     inflate x := .mk x.inflate
@@ -46,45 +41,73 @@ instance : Small.{w} (FilterMapMH α f) where
     inflate_deflate := by simp
   }⟩
 
-inductive FilterMapMH.PlausibleStep (it : FilterMapMH α f) : (step : IterStep (FilterMapMH α f) γ) → Prop where
-  | yieldNone : ∀ {it' out}, Iterator.plausible_step m it.inner (.yield it'.inner out) → p none → PlausibleStep it (.skip it')
-  | yieldSome : ∀ {it' out out'}, Iterator.plausible_step m it.inner (.yield it'.inner out) → p (some out') → PlausibleStep it (.yield it' out')
-  | skip : ∀ {it'}, Iterator.plausible_step m it.inner (.skip it'.inner) → PlausibleStep it (.skip it')
-  | done : Iterator.plausible_step m it.inner .done → PlausibleStep it .done
+def FilterMapMH.innerIter {α : Type u} {m : Type w → Type w'} {β : Type v}
+    [i : Iterator α m β]
+    {γ : Type v'} [Small.{w} γ] {p : Option γ → Prop} {f : β → m (USquash <| Subtype p)}
+    (it : Iter (α := FilterMapMH α f) m γ) : Iter (α := α) m β :=
+  haveI := i.state_small
+  toIter it.inner.inner m β
 
-instance : Iterator (FilterMapMH α f) m γ where
-  state_small := inferInstance
+def FilterMapMH.mkOfInnerIter {α : Type u} {m : Type w → Type w'} {β : Type v}
+    [i : Iterator α m β]
+    {γ : Type v'} [Small.{w} γ] {p : Option γ → Prop} {f : β → m (USquash <| Subtype p)}
+    (it : Iter (α := α) m β) : Iter (α := FilterMapMH α f) m γ :=
+  haveI := i.state_small
+  toIter ⟨it.inner⟩ m γ
+
+theorem FilterMapMH.innerIter_mkOfInnerIter {α : Type u} {m : Type w → Type w'} {β : Type v}
+    [i : Iterator α m β]
+    {γ : Type v'} [Small.{w} γ] {p : Option γ → Prop} {f : β → m (USquash <| Subtype p)}
+    (it : Iter (α := α) m β) :
+    innerIter (mkOfInnerIter it (f := f)) = it := by
+  cases it
+  simp [mkOfInnerIter, innerIter]
+
+def MapMH (α : Type u) {β : Type v} {γ : Type v'} {m : Type w → Type w'} [Functor m]
+    [Small.{w} γ] {p : γ → Prop} (f : β → m (USquash <| Subtype p)) :=
+  FilterMapMH α (γ := γ) (p := fun x => ∃ y, x = some y ∧ p y)
+    (fun x => (USquash.deflate ∘ (fun y => ⟨some y.1, y.1, rfl, y.2⟩) ∘ USquash.inflate) <$> f x)
+
+inductive FilterMapMH.PlausibleStep (it : Iter (α := FilterMapMH α f) m γ) : (step : IterStep (Iter (α := FilterMapMH α f) m γ) γ) → Prop where
+  | yieldNone : ∀ {it' out}, (innerIter it).plausible_step (.yield it' out) →
+      p none → PlausibleStep it (.skip (mkOfInnerIter it'))
+  | yieldSome : ∀ {it' out out'}, (innerIter it).plausible_step (.yield it' out) →
+      p (some out') → PlausibleStep it (.yield (mkOfInnerIter it') out')
+  | skip : ∀ {it'}, (innerIter it).plausible_step (.skip it') → PlausibleStep it (.skip (mkOfInnerIter it'))
+  | done : (innerIter it).plausible_step .done → PlausibleStep it .done
+
+instance FilterMapMH.instIterator : Iterator (FilterMapMH α f) m γ where
+  state_small := haveI := Iterator.state_small (α := α) (m := m); inferInstance
   value_small := inferInstance
   plausible_step := FilterMapMH.PlausibleStep
   step it := do
-    let step ← Iterator.step (m := m) it.inner
+    let step ← (innerIter it).stepH
     letI step' := step.inflate (small := _)
     match step' with
     | .yield it' out h => do
       match (← f out).inflate with
-      | ⟨none, h'⟩ => pure <| .deflate <| .skip ⟨it'⟩ (.yieldNone h h')
-      | ⟨some out', h'⟩ => pure <| .deflate <| .yield ⟨it'⟩ out' (.yieldSome h h')
-    | .skip it' h => pure <| .deflate <| .skip ⟨it'⟩ (.skip h)
+      | ⟨none, h'⟩ => pure <| .deflate <| .skip (mkOfInnerIter it') (.yieldNone h h')
+      | ⟨some out', h'⟩ => pure <| .deflate <| .yield (mkOfInnerIter it') out' (.yieldSome h h')
+    | .skip it' h => pure <| .deflate <| .skip (mkOfInnerIter it') (.skip h)
     | .done h => pure <| .deflate <| .done (.done h)
 
 instance {p : γ → Prop} {f : β → m (USquash <| Subtype p)} :
     Iterator (MapMH α f) m γ :=
   inferInstanceAs <| Iterator (FilterMapMH α _) m γ
 
--- TODO: This proof needs to use internals of IterationT instead of relying on successor_yield
-instance [Finite α m] : FinitenessRelation (FilterMapMH α f) m where
-  rel := InvImage (Iterator.plausible_successor m) FilterMapMH.inner
+instance FilterMapMH.instFinitenessRelation [Finite α m] : FinitenessRelation (FilterMapMH α f) m where
+  rel := InvImage Iter.plausible_successor_of innerIter
   wf := InvImage.wf _ Finite.wf
   subrelation {it it'} h := by
-    simp only [Iterator.plausible_successor, Iterator.plausible_step] at h
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case yieldNone it' out h' h'' =>
       cases h
-      exact Iterator.successor_of_yield h'
+      simp only [InvImage, innerIter_mkOfInnerIter]
+      exact Iter.plausible_successor_of_yield h'
     case yieldSome it' out h' h'' =>
       cases h
-      exact Iterator.successor_of_yield h'
+      exact Iter.plausible_successor_of_yield h'
     case skip it' h' =>
       cases h
       exact Iterator.successor_of_skip h'
