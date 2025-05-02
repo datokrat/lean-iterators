@@ -40,14 +40,14 @@ instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [It
 
 @[always_inline, inline]
 def Iter.toArray {α : Type w} {m : Type w → Type w'} {β : Type w} [Monad m]
-    {_ : Iterator α m β} (it : Iter (α := α) m β) [IteratorToArray α m]: m (Array β) :=
+    [Iterator α m β] (it : Iter (α := α) m β) [IteratorToArray α m] : m (Array β) :=
   IteratorToArray.toArrayMapped pure it
 
 end ToArray
 
 @[inline]
 def Iter.reverseToList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
-    {_ : Iterator α m β} [Finite α m] (it : Iter (α := α) m β) : m (List β) :=
+    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m (List β) :=
   go it []
 where
   @[specialize]
@@ -60,5 +60,5 @@ where
 
 @[inline]
 def Iter.toList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
-    {_ : Iterator α m β} (it : Iter (α := α) m β) [IteratorToArray α m] : m (List β) :=
+    [Iterator α m β] (it : Iter (α := α) m β) [IteratorToArray α m] : m (List β) :=
   Array.toList <$> Iter.toArray it

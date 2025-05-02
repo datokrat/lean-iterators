@@ -153,6 +153,18 @@ theorem IterStep.map_id' {it : IterStep α β} :
     it.map (·) (·) = it :=
   map_id
 
+@[simp]
+theorem IterStep.map_done {f : α → α'} {g : β → β'} :
+  (.done : IterStep α β).map f g = .done := rfl
+
+@[simp]
+theorem IterStep.map_skip {f : α → α'} {g : β → β'} :
+  (.skip it : IterStep α β).map f g = .skip (f it) := rfl
+
+@[simp]
+theorem IterStep.map_yield {f : α → α'} {g : β → β'} :
+  (.yield it out : IterStep α β).map f g = .yield (f it) (g out) := rfl
+
 theorem IterStep.map_map {α' : Type u'} {β' : Type v'} {f : α → α'} {g : β → β'}
     {α'' : Type u''} {β'' : Type v''} {f' : α' → α''} {g' : β' → β''} {it : IterStep α β} :
     (it.map f g).map f' g' = it.map (f · |> f') (g · |> g') := by
