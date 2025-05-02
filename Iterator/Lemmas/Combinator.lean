@@ -162,13 +162,38 @@ theorem filterMapH_step [LawfulMonad m] {f : β → Option β'} :
 
 end Step
 
+section Lawful
+
+variable {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type v'} [Small.{w} γ]
+    [Monad m] [Iterator α m β] {p : Option γ → Prop} {f : β → m (USquash <| Subtype p)}
+
+instance {p : γ → Prop} {f : β → m (USquash <| Subtype p)} [LawfulMonad m] [IteratorToArray α m]
+    [LawfulIteratorToArray α m] [Finite α m] :
+    LawfulIteratorToArray (MapMH α f) m where
+  finite := inferInstance
+  lawful := by
+    intro γ
+    ext f it
+    let y := toIter m it.inner.inner
+    have : it = y.mapH sorry := sorry -- oof
+    simp only [IteratorToArray.toArrayMapped]
+    rw [LawfulIteratorToArray.lawful]
+    induction it using Iter.induct with | step it ih_yield ih_skip =>
+    rw [Iter.DefaultConsumers.toArrayMapped_of_stepH]
+    rw [Iter.DefaultConsumers.toArrayMapped_of_stepH]
+
+
+
+end Lawful
+
 section ToList
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type w}
   [Iterator α m β] (it : Iter (α := α) m β) [Monad m]
 
 theorem toList_filterMapMH {α : Type u} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
-    {_ : Iterator α m β} [Finite α m] {f : β → Option β'} (it : Iter (α := α) m β) :
+    {_ : Iterator α m β} [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → Option β'}
+    (it : Iter (α := α) m β) :
     (it.filterMapH f).toList = (fun x => x.filterMap f) <$> it.toList := by
   induction it using Iter.induct
   rename_i it ihy ihs

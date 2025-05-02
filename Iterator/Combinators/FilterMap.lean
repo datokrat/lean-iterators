@@ -5,6 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Wrapper
+import Iterator.Consumers.Collect
 
 /-!
 This file provides iterator combinators for filtering and mapping.
@@ -105,6 +106,19 @@ instance {p : γ → Prop} {f : β → m (USquash <| Subtype p)} [Productive α 
       simp at h
     case skip it' h =>
       exact h
+
+instance {p : γ → Prop} {f : β → m (USquash <| Subtype p)} [Finite α m] :
+    IteratorToArray (MapMH α f) m :=
+  .defaultImplementation
+
+/--
+`map` operations allow for a more efficient implementation of `toArray`. For example,
+`array.iter.map f |>.toArray happens in-place if possible.
+-/
+instance {p : γ → Prop} {f : β → m (USquash <| Subtype p)} [IteratorToArray α m] :
+    IteratorToArray (MapMH α f) m where
+  toArrayMapped g it :=
+    IteratorToArray.toArrayMapped (fun x => do g (← f x).inflate) (toIter m it.inner.inner)
 
 @[always_inline, inline]
 def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → m (USquash <| Subtype p)) (it : α) :
