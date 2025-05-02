@@ -4,16 +4,16 @@ import Iterator.Combinators.FilterMap
 
 section Consumers
 
-def Iter.induct {α m β} {_ : Iterator α m β} [Finite α m]
+def Iter.induct {α m β} [Iterator α m β] [Finite α m]
   (motive : Iter (α := α) m β → Sort x)
   (step : (it : Iter (α := α) m β) →
     (ih_yield : ∀ {it' : Iter (α := α) m β} {out : β}, it.plausible_step (.yield it' out) → motive it') →
     (ih_skip : ∀ {it' : Iter (α := α) m β}, it.plausible_step (.skip it') → motive it' ) →
     motive it) (it : Iter (α := α) m β) : motive it :=
   step _ (fun {it' _} _ => Iter.induct motive step it') (fun {it'} _ => Iter.induct motive step it')
-termination_by it.terminationByFinite
+termination_by it.finitelyManySteps
 
-theorem Iter.DefaultConsumers.toArrayMapped.go.aux₁ [Monad m] [LawfulMonad m] {_ : Iterator α m β} [Finite α m]
+theorem Iter.DefaultConsumers.toArrayMapped.go.aux₁ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : Iter (α := α) m β} {b : γ} {bs : Array γ} {f : β → m γ} :
     Iter.DefaultConsumers.toArrayMapped.go f it (#[b] ++ bs) = (#[b] ++ ·) <$> Iter.DefaultConsumers.toArrayMapped.go f it bs := by
   induction it, bs using Iter.DefaultConsumers.toArrayMapped.go.induct
@@ -28,7 +28,7 @@ theorem Iter.DefaultConsumers.toArrayMapped.go.aux₁ [Monad m] [LawfulMonad m] 
   · simp
 
 theorem Iter.DefaultConsumers.toArrayMapped.go.aux₂ [Monad m] [LawfulMonad m]
-    {_ : Iterator α m β} [Finite α m] {it : Iter (α := α) m β} {acc : Array γ} {f : β → m γ} :
+    [Iterator α m β] [Finite α m] {it : Iter (α := α) m β} {acc : Array γ} {f : β → m γ} :
     Iter.DefaultConsumers.toArrayMapped.go f it acc =
       (acc ++ ·) <$> Iter.DefaultConsumers.toArrayMapped f it := by
   rw [← Array.toArray_toList (xs := acc)]
@@ -40,7 +40,7 @@ theorem Iter.DefaultConsumers.toArrayMapped.go.aux₂ [Monad m] [LawfulMonad m]
     simp only [Functor.map_map, Array.append_assoc]
 
 theorem Iter.DefaultConsumers.toArrayMapped_of_stepH [Monad m] [LawfulMonad m]
-    {_ : Iterator α m β} [Finite α m] {it : Iter (α := α) m β} {f : β → m γ} :
+    [Iterator α m β] [Finite α m] {it : Iter (α := α) m β} {f : β → m γ} :
     Iter.DefaultConsumers.toArrayMapped f it = (do
       match (← it.stepH).inflate with
       | .yield it' out _ => return #[← f out] ++ (← Iter.DefaultConsumers.toArrayMapped f it')
@@ -53,7 +53,7 @@ theorem Iter.DefaultConsumers.toArrayMapped_of_stepH [Monad m] [LawfulMonad m]
   split <;> simp [Iter.DefaultConsumers.toArrayMapped.go.aux₂]
 
 theorem Iter.DefaultConsumers.toArrayMapped_of_step [Monad m] [LawfulMonad m]
-    {_ : Iterator α m β} [Finite α m] {it : Iter (α := α) m β} {f : β → m γ} :
+    [Iterator α m β] [Finite α m] {it : Iter (α := α) m β} {f : β → m γ} :
     Iter.DefaultConsumers.toArrayMapped f it = (do
       match ← it.step with
       | .yield it' out _ => return #[← f out] ++ (← Iter.DefaultConsumers.toArrayMapped f it')
@@ -67,7 +67,7 @@ theorem Iter.DefaultConsumers.toArrayMapped_of_step [Monad m] [LawfulMonad m]
   rfl
 
 theorem Iter.toArray_of_step [Monad m] [LawfulMonad m]
-    {_ : Iterator α m β} [IteratorToArray α m] [LawfulIteratorToArray α m]
+    [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m]
     {it : Iter (α := α) m β} :
     it.toArray = (do
       match ← it.step with
@@ -75,19 +75,19 @@ theorem Iter.toArray_of_step [Monad m] [LawfulMonad m]
       | .skip it' _ => it'.toArray
       | .done _ => return #[]) := by
   rw [Iter.toArray, LawfulIteratorToArray.lawful, Iter.DefaultConsumers.toArrayMapped_of_step]
-  simp [Iter.toArray, LawfulIteratorToArray.lawful]
+  simp only [bind_pure_comp, pure_bind, toArray, LawfulIteratorToArray.lawful]
 
-theorem Iter.toList_toArray [Monad m] {_ : Iterator α m β} [IteratorToArray α m]
+theorem Iter.toList_toArray [Monad m] [Iterator α m β] [IteratorToArray α m]
     {it : Iter (α := α) m β} :
     Array.toList <$> it.toArray = it.toList := by
   simp [Iter.toList]
 
-theorem Iter.toArray_toList [Monad m] [LawfulMonad m] {_ : Iterator α m β} [IteratorToArray α m]
+theorem Iter.toArray_toList [Monad m] [LawfulMonad m] [Iterator α m β] [IteratorToArray α m]
     {it : Iter (α := α) m β} :
     List.toArray <$> it.toList = it.toArray := by
   simp [Iter.toList]
 
-theorem Iter.toList_of_step [Monad m] [LawfulMonad m] {_ : Iterator α m β}
+theorem Iter.toList_of_step [Monad m] [LawfulMonad m] [Iterator α m β]
     [IteratorToArray α m] [LawfulIteratorToArray α m] {it : Iter (α := α) m β} :
     it.toList = (do
       match ← it.step with
@@ -100,7 +100,7 @@ theorem Iter.toList_of_step [Monad m] [LawfulMonad m] {_ : Iterator α m β}
   ext step
   split <;> simp
 
-theorem Iter.reverseToList.go.aux₁ [Monad m] [LawfulMonad m] {_ : Iterator α m β} [Finite α m]
+theorem Iter.reverseToList.go.aux₁ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : Iter (α := α) m β} {b : β} {bs : List β} :
     Iter.reverseToList.go it (bs ++ [b]) = (· ++ [b]) <$> Iter.reverseToList.go it bs:= by
   induction it, bs using Iter.reverseToList.go.induct
@@ -111,7 +111,7 @@ theorem Iter.reverseToList.go.aux₁ [Monad m] [LawfulMonad m] {_ : Iterator α 
   simp only [List.cons_append] at ih₁
   split <;> simp [*]
 
-theorem Iter.reverseToList.go.aux₂ [Monad m] [LawfulMonad m] {_ : Iterator α m β} [Finite α m]
+theorem Iter.reverseToList.go.aux₂ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : Iter (α := α) m β} {acc : List β} :
     Iter.reverseToList.go it acc = (· ++ acc) <$> it.reverseToList := by
   rw [← List.reverse_reverse (as := acc)]
@@ -120,7 +120,7 @@ theorem Iter.reverseToList.go.aux₂ [Monad m] [LawfulMonad m] {_ : Iterator α 
   | nil => simp [reverseToList]
   | cons x xs ih => simp [Iter.reverseToList.go.aux₁, ih]
 
-theorem Iter.reverseToList_of_step [Monad m] [LawfulMonad m] {_ : Iterator α m β} [Finite α m]
+theorem Iter.reverseToList_of_step [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : Iter (α := α) m β} :
     it.reverseToList = (do
       match ← it.step with
@@ -134,7 +134,7 @@ theorem Iter.reverseToList_of_step [Monad m] [LawfulMonad m] {_ : Iterator α m 
   obtain ⟨step, h⟩ := step
   cases step <;> simp [Iter.reverseToList.go.aux₂]
 
-theorem Iter.reverse_reverseToList [Monad m] [LawfulMonad m] {_ : Iterator α m β}
+theorem Iter.reverse_reverseToList [Monad m] [LawfulMonad m] [Iterator α m β]
     [IteratorToArray α m] [LawfulIteratorToArray α m]
     {it : Iter (α := α) m β} :
     List.reverse <$> it.reverseToList = it.toList := by
