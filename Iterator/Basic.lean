@@ -409,6 +409,13 @@ instance [Iterator α m β] [ProductivenessRelation α m] : Productive α m wher
     · apply InvImage.wf
       exact ProductivenessRelation.wf
 
+instance [Iterator α m β] [Finite α m] : Productive α m where
+  wf := by
+    apply Subrelation.wf (r := Iter.plausible_successor_of)
+    · intro it' it h
+      exact Iter.plausible_successor_of_skip h
+    · exact Finite.wf
+
 end Productive
 
 -- def matchStep {α β γ} (yield : α → β → γ) (skip : α → γ) (done : γ) (step : IterStep α β) : γ :=

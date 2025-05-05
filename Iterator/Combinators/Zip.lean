@@ -62,10 +62,6 @@ instance ZipH.instIterator [Monad m] :
       | .done hp =>
           pure <| .deflate <| .done (.doneRight hm hp)
 
-instance ZipH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] :
-    IteratorFor (ZipH α₁ m α₂ β₂) m n :=
-  .defaultImplementation
-
 @[inline]
 def Iter.zipH [Monad m]
     (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :
@@ -242,6 +238,13 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
       apply Iter.plausible_successor_of_skip hp
     case doneRight out₁ hm hp =>
       cases h
+
+instance ZipH.instIteratorToArray [Monad m] [Finite (ZipH α₁ m α₂ β₂) m] : IteratorToArray (ZipH α₁ m α₂ β₂) m :=
+  .defaultImplementation
+
+instance ZipH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Finite (ZipH α₁ m α₂ β₂) m] :
+    IteratorFor (ZipH α₁ m α₂ β₂) m n :=
+  .defaultImplementation
 
 end ZipH
 

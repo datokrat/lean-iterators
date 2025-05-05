@@ -187,10 +187,6 @@ instance FlatMap.instIterator [Monad m] [Iterator α₂ m γ] : Iterator (FlatMa
         | .done h =>
             pure <| .deflate <| .skip ⟨it₁, none⟩ (.innerDone h)
 
-instance FlatMap.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α₂ m γ] :
-    IteratorFor (FlatMap α f) m n :=
-  .defaultImplementation
-
 end FlatMapDef
 
 section Finite
@@ -275,6 +271,14 @@ instance [Monad m] [Iterator α₂ m γ] [Finite α m] [Finite α₂ m] :
       cases h
       apply FlatMap.rel_of_right₂
 
+instance FlatMap.instIteratorToArray [Monad m] [Iterator α₂ m γ] [Finite α m] [Finite α₂ m] :
+    IteratorToArray (FlatMap α f) m :=
+  .defaultImplementation
+
+instance FlatMap.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α₂ m γ] :
+    IteratorFor (FlatMap α f) m n :=
+  .defaultImplementation
+
 end Finite
 
 section Dependent
@@ -312,10 +316,6 @@ instance SigmaIterator.instIterator {β : Type v} {α : β → Type w} [Monad m]
     | .done h =>
       pure <| .deflate <| .done (.done h)
 
-instance SigmaIterator.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [∀b, Iterator (α b) m γ] :
-    IteratorFor (SigmaIterator α m γ) m n :=
-  .defaultImplementation
-
 def SigmaIterator.rel [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
     Iter (α := SigmaIterator α m γ) m γ → Iter (α := SigmaIterator α m γ) m γ → Prop :=
   InvImage
@@ -324,7 +324,7 @@ def SigmaIterator.rel [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
       (fun _ => InvImage Iter.TerminationMeasures.Finite.rel Iter.finitelyManySteps))
     (fun it => ⟨it.inner.b.inflate (small := _), it.inner.inner⟩)
 
-instance SigmaIterator.finitenessRelation {β : Type w} {α : β → Type w}
+instance SigmaIterator.finitenessRelation {β : Type v} {α : β → Type w}
     [Monad m] [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] : FinitenessRelation (SigmaIterator α m γ) m where
   rel := SigmaIterator.rel
   wf := by
@@ -350,6 +350,14 @@ instance SigmaIterator.finitenessRelation {β : Type w} {α : β → Type w}
     case done =>
       cases h
 
+instance SigmaIterator.instIteratorToArray [Monad m] [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
+    IteratorToArray (SigmaIterator α m γ) m :=
+  .defaultImplementation
+
+instance SigmaIterator.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [∀ b, Iterator (α b) m γ] :
+    IteratorFor (SigmaIterator α m γ) m n :=
+  .defaultImplementation
+
 end Dependent
 
 section Iter
@@ -358,7 +366,7 @@ set_option pp.universes true in
 @[always_inline, inline]
 def Iter.flatMapD {α : Type w} {β : Type v} {α₂ : β → Type w}
     {γ : Type x} {m : Type w → Type w'}
-    [Monad m] [Iterator α m β] {_ : (b : β) → Iterator (α₂ b) m γ}
+    [Monad m] [Iterator α m β] [(b : β) → Iterator (α₂ b) m γ]
     (f : (b : β) → Iter (α := α₂ b) m γ)
     (it : Iter (α := α) m β) :=
   let motive : Subtype (∃ it : Iter (α := α) m β, it.plausible_output ·) → Type w :=
