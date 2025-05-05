@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 
 /-!
 This file provides the iterator combinator `Iter.drop`.
@@ -82,7 +83,7 @@ def Drop.rel (m : Type w → Type w') [Iterator α m β] [Finite α m] :
     Iter (α := Drop α) m β → Iter (α := Drop α) m β → Prop :=
   InvImage Iter.TerminationMeasures.Finite.rel (Iter.finitelyManySteps ∘ Drop.innerIter)
 
-instance Take.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] :
+instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] :
     FinitenessRelation (Drop α) m where
   rel := Drop.rel m
   wf := by
@@ -106,3 +107,10 @@ instance Take.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] 
       cases h
       apply Iter.plausible_successor_of_yield
       exact h'
+
+instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray (Drop α) m :=
+  .defaultImplementation
+
+instance Drop.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+    IteratorFor (Drop α) m n :=
+  .defaultImplementation

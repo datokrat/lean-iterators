@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 import Iterator.HetT
 
 /-!
@@ -120,6 +121,10 @@ instance {f : β → HetT m (Option γ)} [Finite α m] :
     IteratorToArray (FilterMapMH α f) m :=
   .defaultImplementation
 
+instance FilterMapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+    IteratorFor (FilterMapMH α f) m n :=
+  .defaultImplementation
+
 /--
 `map` operations allow for a more efficient implementation of `toArray`. For example,
 `array.iter.map f |>.toArray happens in-place if possible.
@@ -130,6 +135,10 @@ instance {f : β → HetT m γ} [IteratorToArray α m] :
     IteratorToArray.toArrayMapped
       (fun x => do g ((← (f x).computation).inflate (small := _)))
       (FilterMapMH.innerIter it)
+
+instance MapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+    IteratorFor (MapMH α f) m n :=
+  .defaultImplementation
 
 @[always_inline, inline]
 def Iterator.filterMapMH [Monad m] [Iterator α m β] (f : β → HetT m (Option γ)) (it : α) :

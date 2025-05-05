@@ -187,6 +187,10 @@ instance FlatMap.instIterator [Monad m] [Iterator α₂ m γ] : Iterator (FlatMa
         | .done h =>
             pure <| .deflate <| .skip ⟨it₁, none⟩ (.innerDone h)
 
+instance FlatMap.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α₂ m γ] :
+    IteratorFor (FlatMap α f) m n :=
+  .defaultImplementation
+
 end FlatMapDef
 
 section Finite
@@ -307,6 +311,10 @@ instance SigmaIterator.instIterator {β : Type v} {α : β → Type w} [Monad m]
       pure <| .deflate <| .skip (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ) (.skip h)
     | .done h =>
       pure <| .deflate <| .done (.done h)
+
+instance SigmaIterator.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [∀b, Iterator (α b) m γ] :
+    IteratorFor (SigmaIterator α m γ) m n :=
+  .defaultImplementation
 
 def SigmaIterator.rel [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
     Iter (α := SigmaIterator α m γ) m γ → Iter (α := SigmaIterator α m γ) m γ → Prop :=

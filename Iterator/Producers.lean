@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 import Init.Data.Nat.Lemmas
 
 section ListIterator
@@ -45,6 +46,9 @@ instance [Pure m] : FinitenessRelation (ListIterator α) m where
 instance {α : Type w} [Monad m] : IteratorToArray (ListIterator α) m :=
   .defaultImplementation
 
+instance {α : Type w} [Monad m] [Monad n] [MonadLiftT m n] : IteratorFor (ListIterator α) m n :=
+  .defaultImplementation
+
 end ListIterator
 
 section Unfold
@@ -76,5 +80,8 @@ instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where
   rel := emptyWf.rel
   wf := emptyWf.wf
   subrelation {it it'} h := by cases h
+
+instance [Monad m] [Monad n] [MonadLiftT m n] : IteratorFor (UnfoldIterator α f) m n :=
+  .defaultImplementation
 
 end Unfold

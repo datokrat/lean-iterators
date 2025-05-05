@@ -16,7 +16,7 @@ def primesUntil n := oneToInfinity.take n |>.filter isPrime
 
 /-- info: [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3), (6, 3), (7, 4), (8, 4), (9, 4), (10, 4)] -/
 #guard_msgs in
-#eval oneToInfinity.map (fun n => (n, (primesUntil n).count)) |>.take 10 |>.toList
+#eval! oneToInfinity.map (fun n => (n, (primesUntil n).count)) |>.take 10 |>.toList
 
 end Primes
 
@@ -50,7 +50,7 @@ Fluffy hides a red egg in the lawn.
 Fluffy hides a yellow egg in a boot.
 -/
 #guard_msgs in
-#eval hideEggs
+#eval! hideEggs
 
 def firstOfEach (l : List (List Nat)) : List Nat :=
   l.iter.flatMap (·.iter.take 1) |>.toList

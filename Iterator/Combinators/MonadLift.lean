@@ -4,58 +4,66 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.SimpleIterator
+import Iterator.Basic
+import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 
-variable {α : Type u} {m : Type w → Type w'} {n : Type w → Type w''} {β : Type v}
-    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
+variable {α : Type w} {m : Type w → Type w'} {n : Type w → Type w''} {β : Type v}
+    [Monad m] [Monad n]
 
-structure MonadLiftIterator (α : Type u) (m : Type w → Type w') (n : Type w → Type w'') where
-  inner : α
+structure MonadLiftIterator (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] (n : Type w → Type w'') [MonadLiftT m n] where
+  inner : Iter (α := α) m β
 
-instance [i : ComputableSmall.{w} α] : ComputableSmall.{w} (MonadLiftIterator α m n) :=
-  i.equiv MonadLiftIterator.mk MonadLiftIterator.inner rfl rfl
+inductive MonadLiftIterator.PlausibleStep {_ : Iterator α m β} {_ : MonadLiftT m n} (it : Iter (α := MonadLiftIterator α m n) n β) :
+    IterStep (Iter (α := MonadLiftIterator α m n) n β) β → Prop where
+  | yield {it' out} (h : it.inner.inner.plausible_step (.yield it' out)) :
+      PlausibleStep it (.yield ⟨⟨it'⟩⟩ out)
+  | skip {it'} (h : it.inner.inner.plausible_step (.skip it')) :
+      PlausibleStep it (.skip ⟨⟨it'⟩⟩)
+  | done (h : it.inner.inner.plausible_step .done) :
+      PlausibleStep it .done
 
-instance : Iterator (MonadLiftIterator α m n) n β where
-  plausible_step it step := Iterator.plausible_step m it.inner (step.map MonadLiftIterator.inner id)
+instance {_ : Iterator α m β} {_ : MonadLiftT m n} {it : Iter (α := MonadLiftIterator α m n) n β} :
+    Small.{w} (Subtype <| MonadLiftIterator.PlausibleStep it) := sorry
+
+instance MonadLiftIterator.instIterator {_ : Iterator α m β} {_ : MonadLiftT m n} : Iterator (MonadLiftIterator α m n) n β where
+  plausible_step := PlausibleStep
+  step_small := inferInstance
   step it := do
-    let liftedStep : CodensityT n (PlausibleIterStep.liftedFor m it.inner) := Iterator.step (m := m) it.inner |>.mapH PlausibleIterStep.up |>.run
-    match ← liftedStep |>.mapH PlausibleIterStep.down with
-    | .yield it' b h => pure <| .yield ⟨it'⟩ b h
-    | .skip it' h => pure <| .skip ⟨it'⟩ h
-    | .done h => pure <| .done h
+    match (← it.inner.inner.stepH).inflate with
+    | .yield it' out h => pure <| .deflate <| .yield ⟨⟨it'⟩⟩ out (.yield h)
+    | .skip it' h => pure <| .deflate <| .skip ⟨⟨it'⟩⟩ (.skip h)
+    | .done h => pure <| .deflate <| .done (.done h)
 
-instance [Finite α m] : Finite (MonadLiftIterator α m n) n where
+instance MonadLiftIterator.instIteratorFor [Monad n] [Monad n'] [MonadLiftT n n'] {_ : Iterator α m β} {_ : MonadLiftT m n} :
+    IteratorFor (MonadLiftIterator α m n) n n' :=
+  .defaultImplementation
+
+instance {_ : Iterator α m β} [Finite α m] {_ : MonadLiftT m n} : FinitenessRelation (MonadLiftIterator α m n) n where
+  rel := InvImage Iter.TerminationMeasures.Finite.rel fun it => it.inner.inner.finitelyManySteps
   wf := by
-    let r : FiniteIteratorWF α m → FiniteIteratorWF α m → Prop := FiniteIteratorWF.lt
-    refine Subrelation.wf (r := ?_) ?_ ?_
-    · exact InvImage (FiniteIteratorWF.lt (α := α) (m := m)) (finiteIteratorWF ∘ MonadLiftIterator.inner ∘ FiniteIteratorWF.inner)
-    · intro x y h
-      exact h
-    · apply InvImage.wf
-      exact Finite.wf
-
--- instance : SimpleIterator (MonadLiftIterator α m n) n β where
---   step it := do
---     let step ← (IterationT.step m it.inner).mapH IterStep.up |>.liftInnerMonad n |>.mapH IterStep.down
---     match step with
---     | .yield it' b _ => pure <| .yield ⟨it'⟩ b ⟨⟩
---     | .skip it' _ => pure <| .skip ⟨it'⟩ ⟨⟩
---     | .done _ => pure <| .done ⟨⟩
-
--- instance [Finite α m] : SimpleIterator.Finite (MonadLiftIterator α m n) n where
---   rel := InvImage FiniteIteratorWF.lt (finiteIteratorWF ∘ MonadLiftIterator.inner)
---   wf := InvImage.wf _ Finite.wf
---   subrelation {it it'} h := by
---     simp only [SimpleIterator.step, IterationT.mapH, Bind.bind] at h
+    apply InvImage.wf
+    exact WellFoundedRelation.wf
+  subrelation {it it'} h := by
+    obtain ⟨step, h, h'⟩ := h
+    cases h'
+    case yield it' out h =>
+      cases h
+      apply Iter.plausible_successor_of_yield h
+    case skip it' h =>
+      cases h
+      apply Iter.plausible_successor_of_skip h
+    case done h =>
+      cases h
 
 variable (n) in
 @[always_inline, inline]
-def Iter.monadLift (it : Iter (α := α) m β) :=
-  (toIter n (MonadLiftIterator.mk it.inner (m := m) (n := n)) : Iter n β)
+def Iter.monadLift [Iterator α m β] {_ : MonadLiftT m n} (it : Iter (α := α) m β) :=
+  (toIter (MonadLiftIterator.mk it (m := m) (n := n)) n β : Iter n β)
 
 @[always_inline, inline]
-def Iter.switchMonad {α : Type u} {m : Type w → Type w'} {n : Type w → Type w''} {β : Type v}
-    [Monad m] [Monad n] [Iterator α m β] [ComputableSmall.{w} α] [ComputableSmall.{w} β]
+def Iter.switchMonad {α : Type w} {m : Type w → Type w'} {n : Type w → Type w''} {β : Type v}
+    [Monad m] [Monad n] [Iterator α m β]
     (it : Iter (α := α) m β) (lift : ∀ {γ}, m γ → n γ) :=
   haveI : MonadLift m n := ⟨lift⟩
-  (toIter n (MonadLiftIterator.mk it.inner (m := m) (n := n)) : Iter n β)
+  (toIter (MonadLiftIterator.mk it (m := m) (n := n)) n β : Iter n β)

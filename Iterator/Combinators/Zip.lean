@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 
 section ZipH
 
@@ -60,6 +61,10 @@ instance ZipH.instIterator [Monad m] :
           pure <| .deflate <| .skip ⟨⟨it.inner.left, .deflate (some out₁), it₂'⟩⟩ (.skipRight hm hp)
       | .done hp =>
           pure <| .deflate <| .done (.doneRight hm hp)
+
+instance ZipH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] :
+    IteratorFor (ZipH α₁ m α₂ β₂) m n :=
+  .defaultImplementation
 
 @[inline]
 def Iter.zipH [Monad m]

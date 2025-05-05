@@ -6,6 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
+import Iterator.Consumers.Loop
 
 /-!
 This file provides the iterator combinator `Iter.take`.
@@ -80,7 +81,7 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 @[inline]
-def Iter.take [Monad m] {_ : Iterator α m β}
+def Iter.take [Monad m] [Iterator α m β]
     (n : Nat) (it : Iter (α := α) m β) :=
   toIter (Take.mk n it.inner) m β
 
@@ -124,3 +125,29 @@ instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α
       cases h
     case depleted _ =>
       cases h
+
+instance Take.instIteratorToArray [Monad m] [Iterator α m β] [Productive α m] : IteratorToArray (Take α) m :=
+  .defaultImplementation
+
+instance Take.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+    IteratorFor (Take α) m n :=
+  .defaultImplementation
+  -- TODO: use [IteratorFor α m n]
+    -- forIn {γ} it init successor_of stepper _ := by
+    -- refine Prod.fst <$> (IteratorFor.forIn (α := α) (m := m) (n := n) (innerIter it) (γ := γ × Nat) (init, it.inner.remaining)
+    --   (successor_of := fun b c c' => c.snd = c'.snd + 1) ?_ ?_)
+    -- · exact fun b c => do
+    --     let result ← stepper b c.fst
+    --     return match result.val with
+    --     | .yield x => .yield ⟨
+    --     | .done x => sorry
+    -- refine Subrelation.wf (r := InvImage Iter.TerminationMeasures.Finite.rel (fun p => (p.1).finitelyManySteps)) ?_ ?_
+    -- · intro p' p h
+    --   cases h
+    --   · apply Iter.plausible_successor_of_skip
+    --     rename_i h
+    --     exact h.1
+    --   · rename_i h
+    --     obtain ⟨out, h, _⟩ := h -- Interesting: Moving `obtain` after `apply` leads to failure
+    --     apply Iter.plausible_successor_of_yield
+    --     exact h

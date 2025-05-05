@@ -31,7 +31,7 @@ def IteratorToArray.defaultImplementation {α : Type w} {m : Type w → Type w'}
     [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray α m where
   toArrayMapped := Iter.DefaultConsumers.toArrayMapped
 
-instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [IteratorToArray α m]
+instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β]
     [Monad m] [Iterator α m β] [Finite α m] :
     haveI : IteratorToArray α m := .defaultImplementation
     LawfulIteratorToArray α m :=
