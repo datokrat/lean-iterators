@@ -49,10 +49,10 @@ instance {_ : Iterator α m β} [Finite α m] {_ : MonadLiftT m n} : FinitenessR
     cases h'
     case yield it' out h =>
       cases h
-      apply Iter.plausible_successor_of_yield h
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skip it' h =>
       cases h
-      apply Iter.plausible_successor_of_skip h
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case done h =>
       cases h
 

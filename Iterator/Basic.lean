@@ -305,12 +305,12 @@ structure Iter.TerminationMeasures.Finite
 def Iter.TerminationMeasures.Finite.rel
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
     TerminationMeasures.Finite α m → TerminationMeasures.Finite α m → Prop :=
-  InvImage Iter.plausible_successor_of Iter.TerminationMeasures.Finite.it
+  Relation.TransGen <| InvImage Iter.plausible_successor_of Iter.TerminationMeasures.Finite.it
 
 instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     [Finite α m] : WellFoundedRelation (Iter.TerminationMeasures.Finite α m) where
   rel := Iter.TerminationMeasures.Finite.rel
-  wf := InvImage.wf _ Finite.wf
+  wf := (InvImage.wf _ Finite.wf).transGen
 
 def Iter.finitelyManySteps {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     [Finite α m] (it : Iter (α := α) m β) : Iter.TerminationMeasures.Finite α m :=
@@ -320,13 +320,13 @@ theorem Iter.TerminationMeasures.Finite.rel_of_yield
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     {it it' : Iter (α := α) m β} {out : β} (h : it.plausible_step (.yield it' out)) :
     rel ⟨it'⟩ ⟨it⟩ := by
-  exact ⟨_, rfl, h⟩
+  exact .single ⟨_, rfl, h⟩
 
 theorem Iter.TerminationMeasures.Finite.rel_of_skip
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     {it it' : Iter (α := α) m β} (h : it.plausible_step (.skip it')) :
     rel ⟨it'⟩ ⟨it⟩ := by
-  exact ⟨_, rfl, h⟩
+  exact .single ⟨_, rfl, h⟩
 
 macro_rules | `(tactic| decreasing_trivial) => `(tactic|
   first
@@ -374,12 +374,12 @@ structure Iter.TerminationMeasures.Productive
 def Iter.TerminationMeasures.Productive.rel
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
     TerminationMeasures.Productive α m → TerminationMeasures.Productive α m → Prop :=
-  InvImage Iter.plausible_skip_successor_of Iter.TerminationMeasures.Productive.it
+  Relation.TransGen <| InvImage Iter.plausible_skip_successor_of Iter.TerminationMeasures.Productive.it
 
 instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     [Productive α m] : WellFoundedRelation (Iter.TerminationMeasures.Productive α m) where
   rel := Iter.TerminationMeasures.Productive.rel
-  wf := InvImage.wf _ Productive.wf
+  wf := (InvImage.wf _ Productive.wf).transGen
 
 def Iter.finitelyManySkips {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     [Productive α m] (it : Iter (α := α) m β) : Iter.TerminationMeasures.Productive α m :=
@@ -389,7 +389,7 @@ theorem Iter.TerminationMeasures.Productive.rel_of_skip
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     {it it' : Iter (α := α) m β} (h : it.plausible_step (.skip it')) :
     rel ⟨it'⟩ ⟨it⟩ :=
-  h
+  .single h
 
 macro_rules | `(tactic| decreasing_trivial) => `(tactic|
   exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›)

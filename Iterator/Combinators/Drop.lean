@@ -88,24 +88,23 @@ instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] 
   rel := Drop.rel m
   wf := by
     apply InvImage.wf
-    apply InvImage.wf
-    exact Finite.wf
+    exact WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case drop it' h' _ =>
       cases h
-      apply Iter.plausible_successor_of_yield
+      apply Iter.TerminationMeasures.Finite.rel_of_yield
       exact h'
     case skip it' h' =>
       cases h
-      apply Iter.plausible_successor_of_skip
+      apply Iter.TerminationMeasures.Finite.rel_of_skip
       exact h'
     case done h' =>
       cases h
     case yield it' out h' h'' =>
       cases h
-      apply Iter.plausible_successor_of_yield
+      apply Iter.TerminationMeasures.Finite.rel_of_yield
       exact h'
 
 instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray (Drop α) m :=

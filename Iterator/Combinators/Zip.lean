@@ -124,21 +124,18 @@ instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
     · refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
       · apply ZipH.wellFounded_optionLt
         exact emptyWf.wf
-      · apply InvImage.wf
-        exact Productive.wf
+      · exact WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case yieldLeft hm it' out hp =>
       cases h
       apply ZipH.rel₁_of_left
-      apply Iter.plausible_successor_of_yield
-      exact hp
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skipLeft hm it' hp =>
       cases h
       apply ZipH.rel₁_of_left
-      apply Iter.plausible_successor_of_skip
-      exact hp
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case doneLeft hm hp =>
       cases h
     case yieldRight out₁ hm it₂' out₂ hp =>
@@ -149,7 +146,7 @@ instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
       cases h
       apply ZipH.rel₁_of_right
       · simp_all
-      · exact hp
+      · exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›
     case doneRight out₁ hm hp =>
       cases h
 
@@ -212,8 +209,7 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
     · refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
       · apply ZipH.wellFounded_lt_with_top
         exact emptyWf.wf
-      · apply InvImage.wf
-        exact Productive.wf
+      · exact WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
@@ -225,17 +221,17 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
       cases h
       apply ZipH.rel₂_of_left
       · simp_all
-      · exact hp
+      · exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›
     case doneLeft hm hp =>
       cases h
     case yieldRight out₁ hm it₂' out₂ hp =>
       cases h
       apply ZipH.rel₂_of_right
-      apply Iter.plausible_successor_of_yield hp
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skipRight out₁ hm it₂' hp =>
       cases h
       apply ZipH.rel₂_of_right
-      apply Iter.plausible_successor_of_skip hp
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case doneRight out₁ hm hp =>
       cases h
 

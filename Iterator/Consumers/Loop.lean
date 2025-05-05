@@ -70,12 +70,12 @@ instance {m : Type w → Type w'} {n : Type w → Type w''}
     refine Subrelation.wf (r := InvImage Iter.TerminationMeasures.Finite.rel (fun p => p.1.finitelyManySteps)) ?_ ?_
     · intro p' p h
       cases h
-      · apply Iter.plausible_successor_of_skip
+      · apply Iter.TerminationMeasures.Finite.rel_of_skip
         rename_i h
         exact h.1
       · rename_i h
         obtain ⟨out, h, _⟩ := h -- Interesting: Moving `obtain` after `apply` leads to failure
-        apply Iter.plausible_successor_of_yield
+        apply Iter.TerminationMeasures.Finite.rel_of_yield
         exact h
     · apply InvImage.wf
       exact WellFoundedRelation.wf

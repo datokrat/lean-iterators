@@ -244,29 +244,29 @@ instance [Monad m] [Iterator α₂ m γ] [Finite α m] [Finite α₂ m] :
   wf := by
     apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
-    · exact InvImage.wf _ (InvImage.wf _ Finite.wf)
-    · exact Option.wellFounded_lt <| InvImage.wf _ (InvImage.wf _ Finite.wf)
+    · exact InvImage.wf _ WellFoundedRelation.wf
+    · exact Option.wellFounded_lt <| InvImage.wf _ WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case outerYield =>
       cases h
       apply FlatMap.rel_of_left
-      exact Iter.plausible_successor_of_yield ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case outerSkip =>
       cases h
       apply FlatMap.rel_of_left
-      exact Iter.plausible_successor_of_skip ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case outerDone =>
       cases h
     case innerYield =>
       cases h
       apply FlatMap.rel_of_right₁
-      exact Iter.plausible_successor_of_yield ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case innerSkip =>
       cases h
       apply FlatMap.rel_of_right₁
-      exact Iter.plausible_successor_of_skip ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case innerDone =>
       cases h
       apply FlatMap.rel_of_right₂
@@ -334,19 +334,18 @@ instance SigmaIterator.finitenessRelation {β : Type v} {α : β → Type w}
     · exact emptyWf.wf.apply b
     · intro
       apply InvImage.wf
-      apply InvImage.wf
-      exact Finite.wf
+      exact WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case yield =>
       cases h
       apply PSigma.Lex.right
-      exact Iter.plausible_successor_of_yield ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skip =>
       cases h
       apply PSigma.Lex.right
-      exact Iter.plausible_successor_of_skip ‹_›
+      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
     case done =>
       cases h
 

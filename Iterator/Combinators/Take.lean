@@ -106,8 +106,7 @@ instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α
     apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
-    · apply InvImage.wf
-      exact Productive.wf
+    · exact WellFoundedRelation.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
@@ -120,7 +119,7 @@ instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α
       obtain ⟨it, k, rfl⟩ := mkOfInnerIter_surjective it
       cases h''
       apply Take.rel_of_inner
-      exact h'
+      exact Iter.TerminationMeasures.Productive.rel_of_skip h'
     case done _ =>
       cases h
     case depleted _ =>
