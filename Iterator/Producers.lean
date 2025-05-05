@@ -5,6 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Basic
+import Iterator.Consumers.Collect
 import Init.Data.Nat.Lemmas
 
 section ListIterator
@@ -40,6 +41,9 @@ instance [Pure m] : FinitenessRelation (ListIterator α) m where
     simp_wf
     obtain ⟨step, h, h'⟩ := h
     cases step <;> simp_all [IterStep.successor, Iter.plausible_step, Iterator.plausible_step]
+
+instance {α : Type w} [Monad m] : IteratorToArray (ListIterator α) m :=
+  .defaultImplementation
 
 end ListIterator
 

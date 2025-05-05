@@ -4,28 +4,55 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
-import Iterator.SimpleIterator
+import Iterator.Basic
+import Iterator.Consumers.Collect
 
 /-!
 This file provides the iterator combinator `Iter.take`.
 -/
 
-variable {α : Type u} {m : Type w → Type w'} {β : Type v}
+variable {α : Type w} {m : Type w → Type w'} {β : Type v}
 
-@[ext]
 structure Take (α : Type u) where
   remaining : Nat
   inner : α
 
-instance [Monad m] [Iterator α m β] : SimpleIterator (Take α) m β where
+def Take.innerIter {α : Type w} {m : Type w → Type w'} {β : Type v}
+    (it : Iter (α := Take α) m β) : Iter (α := α) m β :=
+  toIter it.inner.inner m β
+
+def Take.mkOfInnerIter {α : Type w} {m : Type w → Type w'} {β : Type v}
+    (it : Iter (α := α) m β) (remaining : Nat) : Iter (α := Take α) m β :=
+  toIter ⟨remaining, it.inner⟩ m β
+
+theorem Take.mkOfInnerIter_surjective {α : Type w} {m : Type w → Type w'} {β : Type v}
+    (it : Iter (α := Take α) m β) :
+    ∃ it₀ k, it = mkOfInnerIter it₀ k := by
+  refine ⟨innerIter it, it.inner.remaining, rfl⟩
+
+inductive Take.PlausibleStep [Iterator α m β] (it : Iter (α := Take α) m β) :
+    (step : IterStep (Iter (α := Take α) m β) β) → Prop where
+  | yield : ∀ {it' out k}, (innerIter it).plausible_step (.yield it' out) →
+      it.inner.remaining = k + 1 → PlausibleStep it (.yield (mkOfInnerIter it' k) out)
+  | skip : ∀ {it' k}, (innerIter it).plausible_step (.skip it') →
+      it.inner.remaining = k + 1 → PlausibleStep it (.skip (mkOfInnerIter it' (k + 1)))
+  | done : (innerIter it).plausible_step .done → PlausibleStep it .done
+  | depleted : it.inner.remaining = 0 → PlausibleStep it .done
+
+instance [Iterator α m β] {it : Iter (α := Take α) m β} :
+    Small.{w} (Subtype <| Take.PlausibleStep it) := sorry
+
+instance Take.instIterator [Monad m] [Iterator α m β] : Iterator (Take α) m β where
+  plausible_step := Take.PlausibleStep
+  step_small := inferInstance
   step it :=
-    match it with
-    | { remaining := 0, inner := _ } => pure <| .done
-    | { remaining := remaining' + 1, inner := it } =>
-      matchStep (m := m) it
-        (fun it' b => pure <| .yield ⟨remaining', it'⟩ b)
-        (fun it' => pure <| .skip ⟨remaining' + 1, it'⟩)
-        (pure <| .done)
+    match h : it.inner.remaining with
+    | 0 => pure <| .deflate <| .done (.depleted h)
+    | k + 1 => do
+      match (← (innerIter it).stepH).inflate (small := _) with
+      | .yield it' out h' => pure <| .deflate <| .yield (mkOfInnerIter it' k) out (.yield h' h)
+      | .skip it' h' => pure <| .deflate <| .skip (mkOfInnerIter it' (k + 1)) (.skip h' h)
+      | .done h' => pure <| .deflate <| .done (.done h')
 
 /--
 Given an iterator `it` and a natural number `n`, `it.take n` is an iterator that outputs
@@ -53,43 +80,47 @@ _TODO_: prove `Productive`
 This combinator incurs an additional O(1) cost with each output of `it`.
 -/
 @[inline]
-def Iter.take [Monad m] {_ : Iterator α m β} [ComputableUnivLE.{u, w}] {small : ComputableSmall.{w} α}
-    (n : Nat) (it : Iter (α := α) m β (small := small)) :=
-  toIter (α := Take α) m <| Take.mk n it.inner
+def Iter.take [Monad m] {_ : Iterator α m β}
+    (n : Nat) (it : Iter (α := α) m β) :=
+  toIter (Take.mk n it.inner) m β
 
-def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] :
-    Take α → Take α → Prop :=
-  InvImage (Prod.Lex Nat.lt_wfRel.rel ProductiveIteratorWF.lt)
-    (fun it => (it.remaining, productiveIteratorWF (α := α) (m := m) it.inner))
+def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] [Productive α m] :
+    Iter (α := Take α) m β → Iter (α := Take α) m β → Prop :=
+  InvImage (Prod.Lex Nat.lt_wfRel.rel Iter.TerminationMeasures.Productive.rel)
+    (fun it => (it.inner.remaining, (innerIter it).finitelyManySkips))
 
-theorem Take.rel_of_remaining [Monad m] [Iterator α m β] {it it' : Take α}
-    (h : it'.remaining < it.remaining) : Take.rel m it' it :=
+theorem Take.rel_of_remaining [Monad m] [Iterator α m β] [Productive α m] {it it' : Iter (α := Take α) m β}
+    (h : it'.inner.remaining < it.inner.remaining) : Take.rel m it' it :=
   Prod.Lex.left _ _ h
 
-theorem Take.rel_of_inner [Monad m] [Iterator α m β] {remaining : Nat} {it it' : α}
-    (h : (productiveIteratorWF (m := m) it').lt (productiveIteratorWF it)) :
-    Take.rel m ⟨remaining, it'⟩ ⟨remaining, it⟩ :=
+theorem Take.rel_of_inner [Monad m] [Iterator α m β] [Productive α m] {remaining : Nat} {it it' : Iter (α := α) m β}
+    (h : it'.finitelyManySkips.rel it.finitelyManySkips) :
+    Take.rel m (mkOfInnerIter it' remaining) (mkOfInnerIter it remaining) :=
   Prod.Lex.right _ h
 
-instance [Monad m] [Iterator α m β] [Productive α m] : SimpleIterator.Finite (Take α) m where
+instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α m] :
+    FinitenessRelation (Take α) m where
   rel := Take.rel m
   wf := by
     apply InvImage.wf
     refine ⟨fun (a, b) => Prod.lexAccessible (WellFounded.apply ?_ a) (WellFounded.apply ?_) b⟩
     · exact WellFoundedRelation.wf
-    · exact Productive.wf
+    · apply InvImage.wf
+      exact Productive.wf
   subrelation {it it'} h := by
-    cases it
-    simp only [SimpleIterator.step] at h
-    split at h
-    · cases successor_done |>.mp h
-    · rename_i heq
-      cases heq
-      obtain ⟨_, _, hy, h⟩ | ⟨_, hs, h⟩ | ⟨hd, h⟩ := successor_matchStep h
-      · cases successor_yield.mp h
-        apply Take.rel_of_remaining
-        simp
-      · cases successor_skip.mp h
-        apply Take.rel_of_inner
-        exact hs
-      · cases successor_done.mp h
+    obtain ⟨step, h, h'⟩ := h
+    cases h'
+    case yield it' out k h' h'' =>
+      cases h
+      apply rel_of_remaining
+      simp_all [mkOfInnerIter]
+    case skip it' out k h' h'' =>
+      cases h
+      obtain ⟨it, k, rfl⟩ := mkOfInnerIter_surjective it
+      cases h''
+      apply Take.rel_of_inner
+      exact h'
+    case done _ =>
+      cases h
+    case depleted _ =>
+      cases h

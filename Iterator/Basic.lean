@@ -267,8 +267,18 @@ abbrev Iter.Step {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator 
     (it : Iter (α := α) m β) :=
   PlausibleIterStep it.plausible_step
 
+def Iter.plausible_output {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : Iter (α := α) m β) (out : β) : Prop :=
+  ∃ it', it.plausible_step (.yield it' out)
+
+instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {it : Iter (α := α) m β} :
+    Small.{w} (Subtype it.plausible_output) := sorry
+
+instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
+    Small.{w} (Subtype (∃ it : Iter (α := α) m β, it.plausible_output ·)) := sorry
+
 def Iter.plausible_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it' it : (Iter (α := α) m β)) : Prop :=
+    (it' it : Iter (α := α) m β) : Prop :=
   ∃ step, step.successor = some it' ∧ it.plausible_step step
 
 def Iter.plausible_skip_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]

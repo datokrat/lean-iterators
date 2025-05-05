@@ -50,6 +50,9 @@ theorem USquash.inflate_deflate {_ : Small.{u} α} {x : α} :
     (USquash.deflate.{u} x).inflate = x := by
   simp [deflate, inflate, ComputableSmall.inflate_deflate]
 
+theorem USquash.inflate.inj {_ : Small.{u} α} {x y : USquash α} (h : x.inflate = y.inflate) : x = y := by
+  rw [← deflate_inflate (x := x), ← deflate_inflate (x := y), h]
+
 attribute [deprecated "never use!" (since := "2025-04-28")]
   USquash.inner USquash.mk'
 
