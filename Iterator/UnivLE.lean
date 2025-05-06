@@ -5,6 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Init.Core
+import Init.Ext
 import Init.SimpLemmas
 import Init.NotationExtra
 import Init.Classical
@@ -105,6 +106,100 @@ instance {α : Type v} [Small.{u} α] : Small.{u} (Option α) where
     inflate x := x.map USquash.inflate
     deflate_inflate {x} := by cases x <;> simp
     inflate_deflate {x} := by cases x <;> simp }⟩
+
+def Small.small_quotient {α : Type v} [Small.{w} α] (s : Setoid α) : Small.{w} (Quotient s) where
+  h :=
+    letI s' : Setoid (USquash.{w} α) := {
+      r x y := s.r x.inflate y.inflate,
+      iseqv := {
+        refl a := s.iseqv.refl a.inflate
+        symm h := s.iseqv.symm h
+        trans h h' := s.iseqv.trans h h' } }
+    ⟨⟨Quotient s',
+      Quotient.lift (Quotient.mk s' ∘ USquash.deflate) (by
+          intro a b h
+          apply Quotient.sound
+          simp only [HasEquiv.Equiv, Setoid.r, USquash.inflate_deflate, s']
+          exact h),
+      Quotient.lift (Quotient.mk s ∘ USquash.inflate) (by
+          intro a b h
+          apply Quotient.sound
+          simp only [HasEquiv.Equiv, Setoid.r, s'] at h
+          exact h),
+      (by
+        intro a
+        obtain ⟨_, rfl⟩ := Quotient.exists_rep a
+        simp [Quotient.lift, Quotient.mk]),
+      (by
+        intro a
+        obtain ⟨_, rfl⟩ := Quotient.exists_rep a
+        simp [Quotient.lift, Quotient.mk])⟩⟩
+
+instance Small.instSmall_quotient {α : Type v} [Small.{w} α] [s : Setoid α] : Small.{w} (Quotient s) :=
+  Small.small_quotient s
+
+def Small.small_domain {α : Type v} {β : Type v'} [Small.{w} α] {f : α → β}
+    (h : ∀ b, ∃ a, f a = b) : Small.{w} β where
+  h :=
+    letI s : Setoid α := { r x y := f x = f y, iseqv := {
+      refl _ := rfl
+      symm h := Eq.symm h
+      trans h h' := Eq.trans h h' } }
+    ⟨⟨USquash <| Quotient s,
+      (by
+        intro b
+        apply USquash.deflate
+        apply Quotient.mk
+        exact (h b).choose),
+      (by
+        refine Function.comp ?_ USquash.inflate
+        apply Quotient.lift f
+        exact fun _ _ => id),
+      (by
+        intro a
+        rw [← USquash.deflate_inflate (x := a)]
+        apply congrArg USquash.deflate
+        generalize a.inflate = a
+        obtain ⟨_, rfl⟩ := Quotient.exists_rep a
+        apply Quotient.sound
+        simp only [HasEquiv.Equiv, Setoid.r, Function.comp_apply, USquash.inflate_deflate, s]
+        exact Exists.choose_spec (p := (f · = _)) _),
+      (by
+        intro a
+        simp only [Quotient.lift, Quotient.mk, Function.comp_apply, USquash.inflate_deflate, s]
+        exact (h a).choose_spec)⟩⟩
+
+private theorem Eq.apply_rec {α : Type u} {β : α → Type v} {γ : α → Type w} {a a' : α} (h : a = a')
+    (f : ∀ a, β a → γ a) (x : β a) : f a' (h ▸ x) = h ▸ (f a x) := by
+  cases h
+  simp
+
+private theorem Eq.rec_heq_self {α : Type u} {a a' : α} {motive : (a' : α) → a = a' → Type v}
+    {x : motive a rfl} {h : a = a'} : HEq (Eq.rec x h : motive a' h) x := by
+  cases h
+  exact .refl _
+
+instance Small.instSmall_sigma {α : Type v} {β : α → Type v'} [Small.{w} α] [∀ a, Small.{w} (β a)] : Small.{w} (Sigma β) where
+  h := ⟨⟨Sigma (fun x : USquash.{w} α => USquash.{w} (β x.inflate)),
+         fun | ⟨a, b⟩ => ⟨.deflate a, .deflate (USquash.inflate_deflate ▸ b)⟩,
+         fun | ⟨a, b⟩ => ⟨a.inflate, b.inflate⟩,
+         (by
+          simp
+          intro p
+          ext
+          · simp
+          · simp [Eq.apply_rec _ (fun a => USquash.deflate)]
+            exact Eq.rec_heq_self),
+         (by
+          simp
+          intro p
+          ext
+          · simp
+          · simp [Eq.apply_rec _ _]
+            exact Eq.rec_heq_self)⟩⟩
+
+instance Small.instProd_sigma {α : Type v} {β : Type v'} [Small.{w} α] [Small.{w} β] : Small.{w} (α × β) :=
+  Small.small_domain.{_, _, w} (α := (_ : α) × β) (f := fun | ⟨a, b⟩ => (a, b)) (fun | (a, b) => ⟨⟨a, b⟩, rfl⟩)
 
 -- @[always_inline, inline]
 -- def ComputableSmall.Target.down {α : Type u} [ComputableSmall α] : ComputableSmall.Lift α → α :=

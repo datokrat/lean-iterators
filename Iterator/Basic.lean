@@ -8,6 +8,7 @@ import Init.Core
 import Init.Classical
 import Init.NotationExtra
 import Init.TacticsExtra
+import Iterator.HetT
 import Iterator.UnivLE
 
 /-!
@@ -288,6 +289,10 @@ def Iter.plausible_skip_successor_of {α : Type w} {m : Type w → Type w'} {β 
 def Iter.stepH {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     (it : Iter (α := α) m β) : m (USquash <| it.Step) :=
   Iterator.step it
+
+def Iter.stepHet {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : Iter (α := α) m β) : HetT m (IterStep (Iter (α := α) m β) β) :=
+  ⟨it.plausible_step, Iterator.step_small, it.stepH⟩
 
 def Iter.step {α : Type w} {m : Type w → Type w'} {β : Type w} [Iterator α m β] [Functor m]
     (it : Iter (α := α) m β) : m it.Step :=
