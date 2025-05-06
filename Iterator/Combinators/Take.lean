@@ -76,7 +76,7 @@ def Take.step [Monad m] [Iterator α m β] (it : Iter (α := Take α m β) m β)
 theorem Take.PlausibleStep.char [Monad m] [Iterator α m β] {it : Iter (α := Take α m β) m β} :
     Take.PlausibleStep it = (Take.step it).property := by
   ext step
-  simp [Take.step]
+  simp only [Take.step]
   split
   · simp only [pure]
     constructor
