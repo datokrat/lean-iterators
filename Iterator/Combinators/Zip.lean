@@ -36,8 +36,74 @@ inductive ZipH.PlausibleStep (it : Iter (α := ZipH α₁ m α₂ β₂) m (β�
   | doneRight {out₁} (hm : it.inner.memoizedLeft.inflate = some out₁) (hp : it.inner.right.plausible_step .done) :
       PlausibleStep it .done
 
-instance {it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)} :
-    Small.{w} (Subtype <| ZipH.PlausibleStep it) := sorry
+def ZipH.step [Monad m] (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
+    HetT m (IterStep (Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) (β₁ × β₂)) :=
+  match it.inner.memoizedLeft.inflate with
+  | none => it.inner.left.stepHet.pbindH fun
+      | ⟨.yield it₁' out, hp⟩ => pure <| .skip ⟨⟨it₁', .deflate (some ⟨out, _, _, hp⟩), it.inner.right⟩⟩
+      | ⟨.skip it₁', _⟩ => pure <| .skip ⟨⟨it₁', .deflate none, it.inner.right⟩⟩
+      | ⟨.done, _⟩ => pure <| .done
+  | some out₁ => it.inner.right.stepHet.bindH fun
+      | .yield it₂' out₂ => pure <| .yield ⟨⟨it.inner.left, .deflate none, it₂'⟩⟩ (out₁, out₂)
+      | .skip it₂' => pure <| .skip ⟨⟨it.inner.left, .deflate (some out₁), it₂'⟩⟩
+      | .done => pure <| .done
+
+theorem ZipH.PlausibleStep.char [Monad m] (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
+    ZipH.PlausibleStep it = (ZipH.step it).property := by
+  ext step
+  simp only [ZipH.step]
+  constructor
+  · intro h
+    cases h
+    case yieldLeft h it₁' out hp =>
+      simp only [h]
+      exact ⟨⟨_, hp⟩, rfl⟩
+    case skipLeft h it₁' hp =>
+      simp only [h]
+      exact ⟨⟨_, hp⟩, rfl⟩
+    case doneLeft h hp =>
+      simp only [h]
+      exact ⟨⟨_, hp⟩, rfl⟩
+    case yieldRight h it₂' out hp =>
+      simp only [h]
+      exact ⟨_, hp, by simp_all only [Option.some.injEq]; rfl⟩
+    case skipRight h it₂' hp =>
+      simp only [h]
+      exact ⟨_, hp, by simp_all only [Option.some.injEq]; rfl⟩
+    case doneRight h hp =>
+      simp only [h]
+      exact ⟨_, hp, rfl⟩
+  · intro h
+    split at h
+    · simp only [HetT.pbindH] at h
+      obtain ⟨⟨step, hp⟩, h⟩ := h
+      cases step
+      case yield =>
+        cases h
+        exact .yieldLeft ‹_› hp
+      case skip =>
+        cases h
+        exact .skipLeft ‹_› hp
+      case done =>
+        cases h
+        exact .doneLeft ‹_› hp
+    · simp only [HetT.bindH] at h
+      obtain ⟨step, hp, h⟩ := h
+      cases step
+      case yield =>
+        cases h
+        exact .yieldRight ‹_› hp
+      case skip =>
+        cases h
+        exact .skipRight ‹_› hp
+      case done =>
+        cases h
+        exact .doneRight ‹_› hp
+
+instance [Monad m] {it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)} :
+    Small.{w} (Subtype <| ZipH.PlausibleStep it) := by
+  rw [ZipH.PlausibleStep.char]
+  exact (ZipH.step it).small
 
 instance ZipH.instIterator [Monad m] :
     Iterator (ZipH α₁ m α₂ β₂) m (β₁ × β₂) where
