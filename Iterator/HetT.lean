@@ -46,6 +46,14 @@ protected def HetT.bindH {m : Type w → Type w'} [Monad m] {α : Type u} {β : 
         .deflate (small := _) <| ⟨b.val, a.val, a.property, b.property⟩) <$> (f a).computation⟩
 
 @[always_inline, inline]
+protected def HetT.pbindH {m : Type w → Type w'} [Monad m] {α : Type u} {β : Type v} (x : HetT m α)
+    (f : Subtype x.property → HetT m β) : HetT m β :=
+  ⟨fun b => ∃ a, (f a).property b, sorry,
+    x.computation >>= fun a => letI a := a.inflate (small := _);
+      (fun b => letI b := b.inflate (small := _);
+        .deflate (small := _) <| ⟨b.val, a, b.property⟩) <$> (f a).computation⟩
+
+@[always_inline, inline]
 protected def HetT.liftMapH {m : Type w → Type w'} [Monad m] {α : Type w} {β : Type v}
     (f : α → β) (x : m α) : HetT m β :=
   ⟨fun b => ∃ a, f a = b, sorry, (fun a => .deflate ⟨f a, a, rfl⟩ (small := _)) <$> x⟩
