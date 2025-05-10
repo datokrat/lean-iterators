@@ -169,7 +169,7 @@ def Small.small_domain {α : Type v} {β : Type v'} [Small.{w} α] {f : α → �
         simp only [Quotient.lift, Quotient.mk, Function.comp_apply, USquash.inflate_deflate, s]
         exact (h a).choose_spec)⟩⟩
 
-private theorem Eq.apply_rec {α : Type u} {β : α → Type v} {γ : α → Type w} {a a' : α} (h : a = a')
+theorem Eq.apply_rec {α : Type u} {β : α → Type v} {γ : α → Type w} {a a' : α} (h : a = a')
     (f : ∀ a, β a → γ a) (x : β a) : f a' (h ▸ x) = h ▸ (f a x) := by
   cases h
   simp

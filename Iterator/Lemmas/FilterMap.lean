@@ -24,7 +24,7 @@ theorem Iterator.bind_hcongr {α : Type w} {m : Type w → Type w'} [Bind m] {β
   cases step with
   | mk step h => exact h'' step h
 
-theorem Iterator.bind_hcongr' {α : Type w} {m : Type w → Type w'} [Bind m] {β : Type w} [Iterator α m β]
+theorem Iterator.bind_hcongr'{α : Type w} {m : Type w → Type w'} [Bind m] {β : Type w} [Iterator α m β]
     {it it' : Iter (α := α) m β} {γ}
     {x : m it.Step}
     {f : it.Step → m γ}
@@ -157,8 +157,8 @@ instance {f : β → HetT m γ} [LawfulMonad m] [IteratorToArray α m]
   lawful := by
     intro γ
     ext f it
-    have : it = (FilterMapMH.innerIter it).mapMH _ := rfl
-    generalize (FilterMapMH.innerIter it) = it at *
+    have : it = it.inner.inner.mapMH _ := rfl
+    generalize it.inner.inner = it at *
     cases this
     simp only [IteratorToArray.toArrayMapped]
     rw [LawfulIteratorToArray.lawful]
@@ -184,16 +184,32 @@ def Iter.Morphisms.filterMapMHCongrRight {α : Type w} {m : Type w → Type w'} 
     {β : Type v} [Iterator α m β]
     {γ : Type v'} {f g : β → HetT m (Option γ)} (h : f = g) :
     Morphism (FilterMapMH α f) (FilterMapMH α g) m := by
-  cases h
-  exact Morphism.id _ m
+  exact h ▸ Morphism.id _ m
+
+-- TODO: upstream from Mathlib.Logic.Basic? Note that this lemma is more general
+theorem Eq.rec_eq_cast {α : Sort _} {a : α} {motive : (a' : α) → a = a' → Sort _} (x : motive a rfl) {a' : α} (h : a = a') :
+    (Eq.rec x h : motive a' h) = cast (by cases h; rfl) x := by
+  cases h; rfl
+
+-- TODO: upstream from Mathlib.Logic.Basic?
+theorem eq_cast_iff_heq : a = cast e b ↔ HEq a b := by cases e; simp
 
 def Iter.Morphisms.mapHToFilterMapH (α : Type w) (m : Type w → Type w') [Monad m] [LawfulMonad m]
     {β : Type v} [Iterator α m β]
     {γ : Type v'} (f : β → γ) :
-    Morphism (β := γ) (MapMH α (fun x => (pure (f x) : HetT m _))) (FilterMapMH α (fun x => (pure (some (f x)) : HetT m _)) (γ := γ)) m where
-  map it := FilterMapMH.mkOfInnerIter (FilterMapMH.innerIter it)
-  plausible_step_map := sorry
-  stepH_hom := sorry
+    Morphism (β := γ) (MapMH α (fun x => (pure (f x) : HetT m _)))
+      (FilterMapMH α (fun x => (pure (some (f x)) : HetT m _)) (γ := γ)) m := by
+  apply Iter.Morphism.copy
+  case f => exact fun it => it.inner.inner.filterMapMH _
+  case φ => exact filterMapMHCongrRight (α := α) (m := m) (by simp)
+  case h =>
+    ext it
+    simp only [filterMapMHCongrRight, Eq.apply_rec _ fun (a : _) (ψ : Morphism _ _ m) => ψ.map it,
+      Morphism.id]
+    rw [Eq.rec_eq_cast, eq_cast_iff_heq]
+    rw (occs := [2]) [(rfl : it = it.inner.inner.filterMapMH _)]
+    apply HEq.congrArg (fun f => it.inner.inner.filterMapMH f)
+    simp
 
 end Congruence
 
@@ -239,6 +255,6 @@ theorem toList_mapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMona
   change (it.filterMapH _).toList = _
   rw [toList_filterMapH]
   change (fun x => x.filterMap (some ∘ f)) <$> it.toList = _
-  rw[List.filterMap_eq_map]
+  rw [List.filterMap_eq_map]
 
 end ToList

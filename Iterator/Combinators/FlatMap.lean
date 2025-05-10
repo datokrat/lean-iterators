@@ -78,9 +78,6 @@ structure FlatMap (α : Type w) [Iterator α m β]
   it₁ : Iter (α := α) m β
   it₂ : Option (Iter (α := α₂) m γ)
 
-def FlatMap.outerIter (it : Iter (α := FlatMap α f) m γ) : Iter (α := α) m β :=
-  it.inner.it₁
-
 -- @[always_inline, inline]
 -- def FlatMap.init (it : α) (f : β → Iter (α := α₂) m β) : FlatMap α f :=
 --   ⟨it, none⟩
@@ -125,6 +122,12 @@ def Iter.flatMap {α : Type w} {β : Type v} {α₂ : Type w}
     {γ : Type x} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
     (f : β → Iter (α := α₂) m γ) (it : Iter (α := α) m β) :=
   (toIter (⟨it, none⟩ : FlatMap α (fun _ out _ => f out)) m γ : Iter m γ)
+
+@[always_inline, inline]
+def Iter.flatMapAfter {α : Type w} {β : Type v} {α₂ : Type w}
+    {γ : Type x} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
+    (f : β → Iter (α := α₂) m γ) (it₁ : Iter (α := α) m β) (it₂ : Option (Iter (α := α₂) m γ)) :=
+  (toIter (⟨it₁, it₂⟩ : FlatMap α (fun _ out _ => f out)) m γ : Iter m γ)
 /-
 variable (m f) in
 @[always_inline, inline]

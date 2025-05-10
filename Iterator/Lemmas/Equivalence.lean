@@ -32,3 +32,10 @@ def Iter.Morphism.id (α : Type w) (m : Type w → Type w') [Functor m] [LawfulF
     generalize step.inflate = step
     obtain ⟨step, _⟩ := step
     cases step <;> simp
+
+def Iter.Morphism.copy {α α' : Type w} {m : Type w → Type w'} [Functor m] {β : Type v}
+    [Iterator α m β] [Iterator α' m β] (φ : Morphism α α' m) {f : Iter (α := α) m β → Iter (α := α') m β}
+    (h : f = φ.map) : Morphism α α' m where
+  map := f
+  plausible_step_map := h ▸ φ.plausible_step_map
+  stepH_hom := by cases h; exact φ.stepH_hom

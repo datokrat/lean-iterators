@@ -66,6 +66,42 @@ instance {m : Type w → Type w'} [Monad m] : Monad (HetT.{w, w', u} m) where
   pure x := ⟨fun y => x = y, sorry, pure <| .deflate (small := _) ⟨x, rfl⟩⟩
   bind x f := x.bindH f
 
+theorem HEq.congrArg {α : Sort u} {β : α → Type v} (f : (a : α) → β a) {a a'} (h : a = a') :
+    HEq (f a) (f a') := by
+  cases h; rfl
+
+theorem HEq.congrArg₂ {α : Sort u} {β : α → Type v} {γ : (a : α) → (b : β a) → Sort w}
+    (f : (a : α) → (b : β a) → γ a b)
+    {α α' a a'} (h : α = α') (h' : HEq a a') : HEq (f α a) (f α' a') := by
+  cases h; cases h'; rfl
+
+theorem HEq.congrArg₃ {α : Sort u} {β : (a : α) → Sort v} {γ : (a : α) → (b : β a) → Sort w}
+    {δ : (a : α) → (b : β a) → (c : γ a b) → Sort x}
+    (f : (a : α) → (b : β a) → (c : γ a b) → δ a b c)
+    {a a' b b' c c'} (h₁ : a = a') (h₂ : HEq b b') (h₃ : HEq c c') : HEq (f a b c) (f a' b' c') := by
+  cases h₁; cases h₂; cases h₃; rfl
+
+theorem HEq.congrArg₄ {α : Sort u} {β : (a : α) → Sort v} {γ : (a : α) → (b : β a) → Sort w}
+    {δ : (a : α) → (b : β a) → (c : γ a b) → Sort x} {ε : (a : α) → (b : β a) → (c : γ a b) → (d : δ a b c) → Sort y}
+    (f : (a : α) → (b : β a) → (c : γ a b) → (d : δ a b c) → ε a b c d)
+    {a a' b b' c c' d d'} (h₁ : a = a') (h₂ : HEq b b') (h₃ : HEq c c') (h₄ : HEq d d') : HEq (f a b c d) (f a' b' c' d') := by
+  cases h₁; cases h₂; cases h₃; cases h₄; rfl
+
+@[simp]
+protected theorem HetT.mapH_pure {m : Type w → Type w'} [Monad m] [LawfulMonad m] {α : Type u} {β : Type v}
+    {f : α → β} {a : α} :
+    (pure a : HetT m α).mapH f = pure (f a) := by
+  simp [HetT.mapH, pure, mk.injEq, map_pure, USquash.inflate_deflate]
+  apply HEq.congrArg₂ (f := fun α (a : α) => (pure a : m _)) (by simp)
+  apply HEq.congrArg₃ (f := fun α i (a : α) => USquash.deflate a (small := i))
+  · simp
+  · simp
+  · apply HEq.congrArg₄ fun β (p : β → Prop) (x : β) (h : p x) => Subtype.mk x h
+    · rfl
+    · simp
+    · rfl
+    · simp
+
 @[simp]
 theorem HetT.property_mapH {m : Type w → Type w'} [Functor m] {α : Type u} {β : Type v}
     {x : HetT m α} {f : α → β} {b : β} :
@@ -79,7 +115,7 @@ theorem HetT.property_mapH {m : Type w → Type w'} [Functor m] {α : Type u} {�
 
 @[simp]
 theorem HetT.computation_mapH {m : Type w → Type w'} [Functor m] {α : Type u} {β : Type v}
-    {x : HetT m α} {f : α → β} {b : β} :
+    {x : HetT m α} {f : α → β} :
     (x.mapH f).computation = (fun a => .deflate ⟨_, a.inflate (small := _), rfl⟩ (small := _)) <$> x.computation :=
   rfl
 
