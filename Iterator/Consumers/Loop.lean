@@ -1,44 +1,20 @@
 import Iterator.Basic
 
-def IterM.ForInWillTerminate (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] {γ : Type w}
-    (successor_of : β → γ → γ → Prop) : Prop :=
-  WellFounded (fun (c' c : IterM (α := α) m β × γ) =>
-    (c'.1.plausible_skip_successor_of c.1 ∧ c'.2 = c.2) ∨ (∃ b, c.1.plausible_step (.yield c'.1 b) ∧ successor_of b c.2 c'.2))
-
-def IterM.TerminationMeasures.ForInTerminates {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {γ : Type w}
-    {successor_of : β → γ → γ → Prop} (_terminates : IterM.ForInWillTerminate α m successor_of) := IterM (α := α) m β × γ
-
-def IterM.TerminationMeasures.ForInTerminates.mk {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {γ : Type w}
-    {successor_of : β → γ → γ → Prop} (terminates : IterM.ForInWillTerminate α m successor_of) (it : IterM (α := α) m β) (c : γ) :
-    ForInTerminates terminates :=
-  (it, c)
-
-instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {γ : Type w}
-    {successor_of : β → γ → γ → Prop} {terminates : IterM.ForInWillTerminate α m successor_of} :
-    WellFoundedRelation (IterM.TerminationMeasures.ForInTerminates terminates) where
-  rel p' p := (p'.1.plausible_skip_successor_of p.1 ∧ p'.2 = p.2) ∨ (∃ b, p.1.plausible_step (.yield p'.1 b) ∧ successor_of b p.2 p'.2)
-  wf := terminates
-
+set_option trace.Elab.Tactic.monotonicity true in
 @[specialize]
 def IterM.DefaultConsumers.forIn {m : Type w → Type w'} {n : Type w → Type w''} [Monad n] [MonadLiftT m n]
-    {α : Type w} {β : Type v} {γ : Type w}
+    {α : Type w} {β : Type v} {γ : Type w} [Nonempty (n γ)]
     [Iterator α m β]
     (it : IterM (α := α) m β) (init : γ) {successor_of : β → γ → γ → Prop}
-    (f : (b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value))
-    (terminates : IterM.ForInWillTerminate α m successor_of) : n γ := do
+    (f : (b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value)) : n γ := do
   match (← it.stepH).inflate with
   | .yield it' out _ =>
     match ← f out init with
-    | ⟨.yield c, _⟩ => IterM.DefaultConsumers.forIn it' c f terminates
+    | ⟨.yield c, _⟩ => IterM.DefaultConsumers.forIn it' c f
     | ⟨.done c, _⟩ => return c
-  | .skip it' _ => IterM.DefaultConsumers.forIn it' init f terminates
+  | .skip it' _ => IterM.DefaultConsumers.forIn it' init f
   | .done _ => return init
-termination_by IterM.TerminationMeasures.ForInTerminates.mk terminates it init
-decreasing_by
-  · apply Or.inr
-    exact ⟨out, ‹_›, ‹_›⟩
-  · apply Or.inl
-    exact ⟨‹_›, rfl⟩
+partial_fixpoint
 
 class IteratorFor (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] (n : Type w → Type w'') where
   forIn : ∀ {γ : Type w}, IterM (α := α) m β → γ → {successor_of : β → γ → γ → Prop} →
