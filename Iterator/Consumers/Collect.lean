@@ -3,12 +3,12 @@ import Iterator.Basic
 section ToArray
 
 @[always_inline, inline]
-def Iter.DefaultConsumers.toArrayMapped {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type v}
-    {instIt : Iterator α m β} [Finite α m] {γ : Type w} (f : β → m γ) (it : Iter (α := α) m β) : m (Array γ) :=
+def IterM.DefaultConsumers.toArrayMapped {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type v}
+    {instIt : Iterator α m β} [Finite α m] {γ : Type w} (f : β → m γ) (it : IterM (α := α) m β) : m (Array γ) :=
   go it #[]
 where
   @[specialize]
-  go [Monad m] [Finite α m] (it : Iter (α := α) m β) a := do
+  go [Monad m] [Finite α m] (it : IterM (α := α) m β) a := do
     match (← it.stepH).inflate with
     | .yield it' b _ => go it' (a.push (← f b))
     | .skip it' _ => go it' a
@@ -16,12 +16,12 @@ where
   termination_by it.finitelyManySteps
 
 class IteratorToArray (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] where
-  toArrayMapped : ∀ {γ : Type w}, (β → m γ) → Iter (α := α) m β → m (Array γ)
+  toArrayMapped : ∀ {γ : Type w}, (β → m γ) → IterM (α := α) m β → m (Array γ)
 
 class LawfulIteratorToArray (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [IteratorToArray α m] where
   finite : Finite α m
   lawful : ∀ γ, IteratorToArray.toArrayMapped (α := α) (m := m) (β := β) (γ := γ) =
-    Iter.DefaultConsumers.toArrayMapped (α := α) (m := m) (γ := γ)
+    IterM.DefaultConsumers.toArrayMapped (α := α) (m := m) (γ := γ)
 
 instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [IteratorToArray α m]
     [LawfulIteratorToArray α m] : Finite α m :=
@@ -29,7 +29,7 @@ instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [It
 
 def IteratorToArray.defaultImplementation {α : Type w} {m : Type w → Type w'}
     [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray α m where
-  toArrayMapped := Iter.DefaultConsumers.toArrayMapped
+  toArrayMapped := IterM.DefaultConsumers.toArrayMapped
 
 instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β]
     [Monad m] [Iterator α m β] [Finite α m] :
@@ -39,15 +39,15 @@ instance (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β]
   ⟨inferInstance, fun _ => rfl⟩
 
 @[always_inline, inline]
-def Iter.toArray {α : Type w} {m : Type w → Type w'} {β : Type w} [Monad m]
-    [Iterator α m β] (it : Iter (α := α) m β) [IteratorToArray α m] : m (Array β) :=
+def IterM.toArray {α : Type w} {m : Type w → Type w'} {β : Type w} [Monad m]
+    [Iterator α m β] (it : IterM (α := α) m β) [IteratorToArray α m] : m (Array β) :=
   IteratorToArray.toArrayMapped pure it
 
 end ToArray
 
 @[inline]
-def Iter.reverseToList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
-    [Iterator α m β] [Finite α m] (it : Iter (α := α) m β) : m (List β) :=
+def IterM.reverseToList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
+    [Iterator α m β] [Finite α m] (it : IterM (α := α) m β) : m (List β) :=
   go it []
 where
   @[specialize]
@@ -59,6 +59,6 @@ where
   termination_by it.finitelyManySteps
 
 @[inline]
-def Iter.toList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
-    [Iterator α m β] (it : Iter (α := α) m β) [IteratorToArray α m] : m (List β) :=
-  Array.toList <$> Iter.toArray it
+def IterM.toList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
+    [Iterator α m β] (it : IterM (α := α) m β) [IteratorToArray α m] : m (List β) :=
+  Array.toList <$> IterM.toArray it

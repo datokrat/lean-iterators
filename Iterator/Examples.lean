@@ -8,7 +8,7 @@ import Std.Time
 
 section Primes
 
-def oneToInfinity := Iter.unfold Id 1 (· + 1)
+def oneToInfinity := IterM.unfold Id 1 (· + 1)
 
 def isPrime (n : Nat) : Bool := (oneToInfinity.take n |>.filter (n % · = 0)).count == 2
 
@@ -22,14 +22,14 @@ end Primes
 
 def hideEggs : IO Unit := do
   -- Repeat colors and locations indefinitely
-  let colors := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+  let colors := IterM.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
     #["green", "red", "yellow"][n % 3]!
-  let locations := Iter.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+  let locations := IterM.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
     #["in a boot", "underneath a lampshade", "under the cushion", "in the lawn"][n % 4]!
   -- Summon the chickens
   let chickens := ["Clucky", "Patches", "Fluffy"].iter Id
   -- Gather, color and hide the eggs
-  let eggs := chickens.flatMap (fun x : String => Iter.unfold Id x id |>.take 3)
+  let eggs := chickens.flatMap (fun x : String => IterM.unfold Id x id |>.take 3)
     |>.zip colors
     |>.zip locations
   -- Report the results (top secret)
@@ -75,8 +75,8 @@ where
 #eval! deepSum [[1, 2], [3, 4]]
 
 def staggeredCounting : List Nat :=
-  Iter.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
-    (fun i => Iter.unfold Id 0 (· + 1) |>.take i) |>.toList
+  IterM.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
+    (fun i => IterM.unfold Id 0 (· + 1) |>.take i) |>.toList
 
 /-- info: [0, 0, 1, 0, 1, 2, 0, 1, 2, 3] -/
 #guard_msgs in
@@ -93,21 +93,21 @@ error: failed to synthesize
           pure
             {
               down :=
-                (fun b => some (IterULiftState.up (Iter.unfold 0 (fun x => x + 1) Id) fun ⦃x x_1⦄ => Functor.map)) b })
+                (fun b => some (IterULiftState.up (IterM.unfold 0 (fun x => x + 1) Id) fun ⦃x x_1⦄ => Functor.map)) b })
         fun ⦃x x_1⦄ => Functor.map))
 Additional diagnostic information may be available using the `set_option diagnostics true` command.
 -/
 -- #guard_msgs in
 -- def notTerminating : List Nat :=
---   Iter.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
---     (fun i => Iter.unfold Id 0 (fun x => x + 1)) |>.toList
+--   IterM.unfold Id 0 (· + 1) |>.take 5 |>.flatMap
+--     (fun i => IterM.unfold Id 0 (fun x => x + 1)) |>.toList
 
 -- The following works -- but don't uncomment it except you want to heat your room for 15s with the compiler:
 -- But it's nice that it works since such dependent flat map operations require boxing in non-dependent languages such
 -- as Rust
 
 def dependentFlatMap (l : List (List Nat)) : List Nat :=
-  let it := Iter.unfold Id 2 (· + 1) |>.zip l.iter
+  let it := IterM.unfold Id 2 (· + 1) |>.zip l.iter
   it.flatMapD (fun (x : Nat × List Nat) => (x.2.iter Id).filter fun y => y % x.1 = 0) |>.toList
 
 /-- info: [2, 6, 9] -/
@@ -115,7 +115,7 @@ def dependentFlatMap (l : List (List Nat)) : List Nat :=
 #eval! dependentFlatMap [[1, 2, 3], [4, 5, 6, 9]]
 
 def addIndices (l : List Nat) : List (Nat × Nat) :=
-  Iter.unfold Id 0 (· + 1) |>.zip (l.iter Id) |>.toList
+  IterM.unfold Id 0 (· + 1) |>.zip (l.iter Id) |>.toList
 
 /-- info: [(0, 3), (1, 1), (2, 4), (3, 1), (4, 5), (5, 9)] -/
 #guard_msgs in
@@ -143,7 +143,7 @@ def printNumsForIn (l : List Nat) : IO Unit := do
     IO.println n
 
 def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
-  Iter.unfold IO 0 (fun _ => 0) |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
+  IterM.unfold IO 0 (fun _ => 0) |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
 
 /-
 info: [time("13:47:35.833520000"),
@@ -157,7 +157,7 @@ info: [time("13:47:35.833520000"),
 -- Note: The following wouldn't work because the `Productive` instance for `.mapM` is still missing
 /-
 def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
-  Iter.unfold 0 (fun _ => 0) IO |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
+  IterM.unfold 0 (fun _ => 0) IO |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
 -/
 
 -- This example demonstrates that chained `mapM` calls are executed in a different order than with `List.mapM`.

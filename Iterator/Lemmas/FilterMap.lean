@@ -2,11 +2,11 @@ import Iterator.Combinators.FilterMap
 import Iterator.Lemmas.Consumer
 
 theorem Iterator.step_hcongr {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    {it₁  it₂ : Iter (α := α) m β} (h : it₁ = it₂) : Iterator.step (m := m) it₁ = h ▸ Iterator.step (m := m) it₂ := by
+    {it₁  it₂ : IterM (α := α) m β} (h : it₁ = it₂) : Iterator.step (m := m) it₁ = h ▸ Iterator.step (m := m) it₂ := by
   cases h; rfl
 
 theorem Iterator.bind_hcongr {α : Type w} {m : Type w → Type w'} [Bind m] {β : Type v}
-    [Iterator α m β] {it it' : Iter (α := α) m β}
+    [Iterator α m β] {it it' : IterM (α := α) m β}
     {γ}
     {x : m (USquash it.Step)}
     {x' : m (USquash it.Step)}
@@ -25,7 +25,7 @@ theorem Iterator.bind_hcongr {α : Type w} {m : Type w → Type w'} [Bind m] {β
   | mk step h => exact h'' step h
 
 theorem Iterator.bind_hcongr'{α : Type w} {m : Type w → Type w'} [Bind m] {β : Type w} [Iterator α m β]
-    {it it' : Iter (α := α) m β} {γ}
+    {it it' : IterM (α := α) m β} {γ}
     {x : m it.Step}
     {f : it.Step → m γ}
     (h : it = it') :
@@ -39,13 +39,13 @@ theorem Iterator.bind_hcongr'{α : Type w} {m : Type w → Type w'} [Bind m] {β
 section StepH
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type v'}
-  [Iterator α m β] (it : Iter (α := α) m β) [Monad m]
+  [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
   (f : β → HetT m (Option β'))
 
 -- @[simp]
 -- theorem plausible_step_filterMapMH :
 --     (it.filterMapMH f).inner.inner = it.inner := by
---   simp [Iter.filterMapMH, Iterator.filterMapMH]
+--   simp [IterM.filterMapMH, Iterator.filterMapMH]
 
 theorem filterMapMH_stepH [LawfulMonad m] :
   (it.filterMapMH f).stepH = (do
@@ -81,7 +81,7 @@ theorem filterMapH_stepH [LawfulMonad m] {f : β → Option β'} :
       pure <| .deflate <| .skip (it'.filterMapH f) (.skip h)
     | .done h =>
       pure <| .deflate <| .done (.done h)) := by
-  simp only [Iter.filterMapH, filterMapMH_stepH, pure]
+  simp only [IterM.filterMapH, filterMapMH_stepH, pure]
   apply bind_congr
   intro step
   generalize step.inflate = step
@@ -117,7 +117,7 @@ end StepH
 section Step
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type w}
-  [Iterator α m β] (it : Iter (α := α) m β) [Monad m]
+  [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
   (f : β → m (USquash <| Option β'))
 
 theorem filterMapH_step [LawfulMonad m] {f : β → Option β'} :
@@ -133,7 +133,7 @@ theorem filterMapH_step [LawfulMonad m] {f : β → Option β'} :
       pure <| .skip (it'.filterMapH f) (.skip h)
     | .done h =>
       pure <| .done (.done h)) := by
-  simp only [Iter.step, filterMapH_stepH, map_eq_pure_bind, bind_assoc]
+  simp only [IterM.step, filterMapH_stepH, map_eq_pure_bind, bind_assoc]
   refine congrArg (_ >>= ·) ?_
   ext step
   simp only [Function.comp_apply, bind_pure_comp]
@@ -162,9 +162,9 @@ instance {f : β → HetT m γ} [LawfulMonad m] [IteratorToArray α m]
     cases this
     simp only [IteratorToArray.toArrayMapped]
     rw [LawfulIteratorToArray.lawful]
-    induction it using Iter.induct with | step it ih_yield ih_skip =>
-    rw [Iter.DefaultConsumers.toArrayMapped_of_stepH]
-    rw [Iter.DefaultConsumers.toArrayMapped_of_stepH]
+    induction it using IterM.induct with | step it ih_yield ih_skip =>
+    rw [IterM.DefaultConsumers.toArrayMapped_of_stepH]
+    rw [IterM.DefaultConsumers.toArrayMapped_of_stepH]
     simp only [mapMH_stepH, bind_assoc]
     apply bind_congr
     intro step
@@ -180,7 +180,7 @@ end Lawful
 
 section Congruence
 
-def Iter.Morphisms.filterMapMHCongrRight {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m]
+def IterM.Morphisms.filterMapMHCongrRight {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m]
     {β : Type v} [Iterator α m β]
     {γ : Type v'} {f g : β → HetT m (Option γ)} (h : f = g) :
     Morphism (FilterMapMH α f) (FilterMapMH α g) m := by
@@ -194,12 +194,12 @@ theorem Eq.rec_eq_cast {α : Sort _} {a : α} {motive : (a' : α) → a = a' →
 -- TODO: upstream from Mathlib.Logic.Basic?
 theorem eq_cast_iff_heq : a = cast e b ↔ HEq a b := by cases e; simp
 
-def Iter.Morphisms.mapHToFilterMapH (α : Type w) (m : Type w → Type w') [Monad m] [LawfulMonad m]
+def IterM.Morphisms.mapHToFilterMapH (α : Type w) (m : Type w → Type w') [Monad m] [LawfulMonad m]
     {β : Type v} [Iterator α m β]
     {γ : Type v'} (f : β → γ) :
     Morphism (β := γ) (MapMH α (fun x => (pure (f x) : HetT m _)))
       (FilterMapMH α (fun x => (pure (some (f x)) : HetT m _)) (γ := γ)) m := by
-  apply Iter.Morphism.copy
+  apply IterM.Morphism.copy
   case f => exact fun it => it.inner.inner.filterMapMH _
   case φ => exact filterMapMHCongrRight (α := α) (m := m) (by simp)
   case h =>
@@ -216,18 +216,18 @@ end Congruence
 section ToList
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type w}
-  [Iterator α m β] (it : Iter (α := α) m β) [Monad m]
+  [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
 
 theorem toList_filterMapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
     [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → Option β'}
-    (it : Iter (α := α) m β) :
+    (it : IterM (α := α) m β) :
     (it.filterMapH f).toList = (fun x => x.filterMap f) <$> it.toList := by
-  induction it using Iter.induct
+  induction it using IterM.induct
   rename_i it ihy ihs
-  rw [Iter.toList_of_step, Iter.toList_of_step]
+  rw [IterM.toList_of_step, IterM.toList_of_step]
   simp
   rw [filterMapH_step]
-  simp only [bind_assoc, Iter.step, map_eq_pure_bind]
+  simp only [bind_assoc, IterM.step, map_eq_pure_bind]
   apply bind_congr
   intro step
   generalize step.inflate = step
@@ -249,9 +249,9 @@ theorem toList_filterMapH {α : Type w} {m : Type w → Type w'} [Monad m] [Lawf
 
 theorem toList_mapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
     [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → β'}
-    (it : Iter (α := α) m β) :
+    (it : IterM (α := α) m β) :
     (it.mapH f).toList = (fun x => x.map f) <$> it.toList := by
-  rw [(Iter.Morphisms.mapHToFilterMapH α m f).toList_eq]
+  rw [(IterM.Morphisms.mapHToFilterMapH α m f).toList_eq]
   change (it.filterMapH _).toList = _
   rw [toList_filterMapH]
   change (fun x => x.filterMap (some ∘ f)) <$> it.toList = _

@@ -22,7 +22,7 @@ The iterator yields the elements of the list in order and then terminates.
 -/
 @[always_inline, inline]
 def List.iter {α : Type w} (l : List α) (m : Type w → Type w' := by exact Id) [Pure m] :
-    Iter (α := ListIterator α) m α :=
+    IterM (α := ListIterator α) m α :=
   toIter { list := l } m α
 
 instance {α : Type w} [Pure m] : Iterator (ListIterator α) m α where
@@ -36,12 +36,12 @@ instance {α : Type w} [Pure m] : Iterator (ListIterator α) m α where
         | ⟨⟨x :: xs⟩⟩ => .deflate ⟨.yield (toIter ⟨xs⟩ m α) x, rfl⟩)
 
 instance [Pure m] : FinitenessRelation (ListIterator α) m where
-  rel := InvImage WellFoundedRelation.rel (ListIterator.list ∘ Iter.inner)
+  rel := InvImage WellFoundedRelation.rel (ListIterator.list ∘ IterM.inner)
   wf := InvImage.wf _ WellFoundedRelation.wf
   subrelation {it it'} h := by
     simp_wf
     obtain ⟨step, h, h'⟩ := h
-    cases step <;> simp_all [IterStep.successor, Iter.plausible_step, Iterator.plausible_step]
+    cases step <;> simp_all [IterStep.successor, IterM.plausible_step, Iterator.plausible_step]
 
 instance {α : Type w} [Monad m] : IteratorToArray (ListIterator α) m :=
   .defaultImplementation
@@ -73,7 +73,7 @@ Creates an infinite, productive iterator. First it yields `init`.
 If the last step yielded `a`, the next will yield `f a`.
 -/
 @[inline]
-def Iter.unfold (m : Type w → Type w') [Pure m] {α : Type w} (init : α) (f : α → α) :=
+def IterM.unfold (m : Type w → Type w') [Pure m] {α : Type w} (init : α) (f : α → α) :=
   toIter (UnfoldIterator.mk (f := f) init) m α
 
 instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where

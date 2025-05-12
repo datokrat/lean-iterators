@@ -9,14 +9,14 @@ import Iterator.Consumers.Collect
 import Iterator.Consumers.Loop
 
 /-!
-This file provides the iterator combinator `Iter.drop`.
+This file provides the iterator combinator `IterM.drop`.
 -/
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v}
 
 structure Drop (α : Type w) (m : Type w → Type w') (β : Type v) where
   remaining : Nat
-  inner : Iter (α := α) m β
+  inner : IterM (α := α) m β
 
 /--
 Given an iterator `it` and a natural number `n`, `it.drop n` is an iterator that forwards all of
@@ -44,12 +44,12 @@ _TODO_: prove `Productive`
 Currently, this combinator incurs an additional O(1) cost with each output of `it`, even when the iterator
 does not drop any elements anymore.
 -/
-def Iter.drop [Iterator α m β]
-    (n : Nat) (it : Iter (α := α) m β) :=
+def IterM.drop [Iterator α m β]
+    (n : Nat) (it : IterM (α := α) m β) :=
   toIter (Drop.mk n it) m β
 
-inductive Drop.PlausibleStep [Iterator α m β] (it : Iter (α := Drop α m β) m β) :
-    (step : IterStep (Iter (α := Drop α m β) m β) β) → Prop where
+inductive Drop.PlausibleStep [Iterator α m β] (it : IterM (α := Drop α m β) m β) :
+    (step : IterStep (IterM (α := Drop α m β) m β) β) → Prop where
   | drop : ∀ {it' out k}, it.inner.inner.plausible_step (.yield it' out) →
       it.inner.remaining = k + 1 → PlausibleStep it (.skip (it'.drop k))
   | skip : ∀ {it'}, it.inner.inner.plausible_step (.skip it') →
@@ -58,8 +58,8 @@ inductive Drop.PlausibleStep [Iterator α m β] (it : Iter (α := Drop α m β) 
   | yield : ∀ {it' out}, it.inner.inner.plausible_step (.yield it' out) →
       it.inner.remaining = 0 → PlausibleStep it (.yield (it'.drop 0) out)
 
-def Drop.step [Monad m] [Iterator α m β] (it : Iter (α := Drop α m β) m β) :
-    HetT m (IterStep (Iter (α := Drop α m β) m β) β) := do
+def Drop.step [Monad m] [Iterator α m β] (it : IterM (α := Drop α m β) m β) :
+    HetT m (IterStep (IterM (α := Drop α m β) m β) β) := do
   match ← it.inner.inner.stepHet with
   | .yield it' out =>
     match it.inner.remaining with
@@ -68,7 +68,7 @@ def Drop.step [Monad m] [Iterator α m β] (it : Iter (α := Drop α m β) m β)
   | .skip it' => return .skip (it'.drop it.inner.remaining)
   | .done => return .done
 
-theorem Drop.PlausibleStep.char [Monad m] [Iterator α m β] {it : Iter (α := Drop α m β) m β} :
+theorem Drop.PlausibleStep.char [Monad m] [Iterator α m β] {it : IterM (α := Drop α m β) m β} :
     Drop.PlausibleStep it = (Drop.step it).property := by
   ext step
   simp only [Drop.step, bind, HetT.bindH]
@@ -94,7 +94,7 @@ theorem Drop.PlausibleStep.char [Monad m] [Iterator α m β] {it : Iter (α := D
       cases h
       exact .done hp
 
-instance [Monad m] [Iterator α m β] {it : Iter (α := Drop α m β) m β} :
+instance [Monad m] [Iterator α m β] {it : IterM (α := Drop α m β) m β} :
     Small.{w} (Subtype <| Drop.PlausibleStep it) := by
   rw [Drop.PlausibleStep.char]
   exact (Drop.step it).small
@@ -114,8 +114,8 @@ instance Drop.instIterator [Monad m] [Iterator α m β] : Iterator (Drop α m β
       pure <| .deflate <| .done (.done h)
 
 def Drop.rel (m : Type w → Type w') [Iterator α m β] [Finite α m] :
-    Iter (α := Drop α m β) m β → Iter (α := Drop α m β) m β → Prop :=
-  InvImage Iter.TerminationMeasures.Finite.rel (Iter.finitelyManySteps ∘ Drop.inner ∘ Iter.inner)
+    IterM (α := Drop α m β) m β → IterM (α := Drop α m β) m β → Prop :=
+  InvImage IterM.TerminationMeasures.Finite.rel (IterM.finitelyManySteps ∘ Drop.inner ∘ IterM.inner)
 
 instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] :
     FinitenessRelation (Drop α m β) m where
@@ -128,17 +128,17 @@ instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] 
     cases h'
     case drop it' h' _ =>
       cases h
-      apply Iter.TerminationMeasures.Finite.rel_of_yield
+      apply IterM.TerminationMeasures.Finite.rel_of_yield
       exact h'
     case skip it' h' =>
       cases h
-      apply Iter.TerminationMeasures.Finite.rel_of_skip
+      apply IterM.TerminationMeasures.Finite.rel_of_skip
       exact h'
     case done h' =>
       cases h
     case yield it' out h' h'' =>
       cases h
-      apply Iter.TerminationMeasures.Finite.rel_of_yield
+      apply IterM.TerminationMeasures.Finite.rel_of_yield
       exact h'
 
 instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray (Drop α m β) m :=

@@ -5,7 +5,7 @@ section FlatMap
 
 theorem flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
     {γ : Type v'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
-    {f : β → Iter (α := α₂) m γ} {it₁ : Iter (α := α) m β} {it₂ : Option (Iter (α := α₂) m γ)} :
+    {f : β → IterM (α := α₂) m γ} {it₁ : IterM (α := α) m β} {it₂ : Option (IterM (α := α₂) m γ)} :
     (it₁.flatMapAfter f it₂).stepH = (match it₂ with
     | none => do
         match (← it₁.stepH).inflate with
@@ -33,7 +33,7 @@ theorem flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Ty
 
 theorem flatMapAfter_step {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
     {γ : Type w} [Monad m] [LawfulMonad m] [Iterator α m β] [Iterator α₂ m γ]
-    {f : β → Iter (α := α₂) m γ} {it₁ : Iter (α := α) m β} {it₂ : Option (Iter (α := α₂) m γ)} :
+    {f : β → IterM (α := α₂) m γ} {it₁ : IterM (α := α) m β} {it₂ : Option (IterM (α := α₂) m γ)} :
     (it₁.flatMapAfter f it₂).step = (match it₂ with
     | none => do
         match (← it₁.stepH).inflate with
@@ -53,7 +53,7 @@ theorem flatMapAfter_step {α α₂ : Type w} {m : Type w → Type w'} {β : Typ
           pure <| .skip (it₁.flatMapAfter f none) (.innerDone h)) := by
   split
   all_goals
-    simp only [Iter.step, flatMapAfter_stepH, map_eq_pure_bind, bind_assoc]
+    simp only [IterM.step, flatMapAfter_stepH, map_eq_pure_bind, bind_assoc]
     apply bind_congr
     intro step
     generalize step.inflate = step
@@ -62,7 +62,7 @@ theorem flatMapAfter_step {α α₂ : Type w} {m : Type w → Type w'} {β : Typ
 
 theorem flatMap_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
     {γ : Type v'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
-    {f : β → Iter (α := α₂) m γ} {it : Iter (α := α) m β} :
+    {f : β → IterM (α := α₂) m γ} {it : IterM (α := α) m β} :
     (it.flatMap f).stepH = (do
       match (← it.stepH).inflate with
       | .yield it' innerIt h =>
@@ -79,7 +79,7 @@ theorem flatMap_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
 
 theorem flatMap_step {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
     {γ : Type w} [Monad m] [LawfulMonad m] [Iterator α m β] [Iterator α₂ m γ]
-    {f : β → Iter (α := α₂) m γ} {it : Iter (α := α) m β} :
+    {f : β → IterM (α := α₂) m γ} {it : IterM (α := α) m β} :
     (it.flatMap f).step = (do
       match (← it.stepH).inflate with
       | .yield it' innerIt h =>
@@ -88,7 +88,7 @@ theorem flatMap_step {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
         pure <| .skip (it'.flatMap f) (.outerSkip h)
       | .done h =>
         pure <| .done (.outerDone h)) := by
-  simp only [Iter.step, flatMap_stepH, map_eq_pure_bind, bind_assoc]
+  simp only [IterM.step, flatMap_stepH, map_eq_pure_bind, bind_assoc]
   apply bind_congr
   intro step
   generalize step.inflate = step
@@ -100,13 +100,13 @@ theorem toList_flatMapAfter_some {α α₂ : Type w} {m : Type w → Type w'} {�
     [Finite α m] [Finite α₂ m]
     [IteratorToArray α m] [IteratorToArray α₂ m]
     [LawfulIteratorToArray α m] [LawfulIteratorToArray α₂ m]
-    {f : β → Iter (α := α₂) m γ} {it₂ : Iter (α := α₂) m γ} {it₁ : Iter (α := α) m β} :
+    {f : β → IterM (α := α₂) m γ} {it₂ : IterM (α := α₂) m γ} {it₁ : IterM (α := α) m β} :
     (it₁.flatMapAfter f (some it₂)).toList = (do
       let l ← it₂.toList
       let l' ← (it₁.flatMap f).toList
       return l ++ l') := by
-  induction it₂ using Iter.induct with | step it₂ ihy ihs =>
-  rw [Iter.toList_of_step, flatMapAfter_step, Iter.toList_of_step]
+  induction it₂ using IterM.induct with | step it₂ ihy ihs =>
+  rw [IterM.toList_of_step, flatMapAfter_step, IterM.toList_of_step]
   simp only [bind_assoc]
   apply bind_congr
   intro step
@@ -125,7 +125,7 @@ theorem toList_flatMap_of_stepH {α α₂ : Type w} {m : Type w → Type w'} {β
     [Finite α m] [Finite α₂ m]
     [IteratorToArray α m] [IteratorToArray α₂ m]
     [LawfulIteratorToArray α m] [LawfulIteratorToArray α₂ m]
-    {f : β → Iter (α := α₂) m γ} {it : Iter (α := α) m β} :
+    {f : β → IterM (α := α₂) m γ} {it : IterM (α := α) m β} :
     (it.flatMap f).toList = (do
       match (← it.stepH).inflate with
       | .yield it' b _ => do
@@ -136,7 +136,7 @@ theorem toList_flatMap_of_stepH {α α₂ : Type w} {m : Type w → Type w'} {β
         (it'.flatMap f).toList
       | .done _ =>
         pure []) := by
-  rw [Iter.toList_of_step, flatMap_step]
+  rw [IterM.toList_of_step, flatMap_step]
   simp only [bind_assoc]
   apply bind_congr
   intro step
@@ -154,11 +154,11 @@ theorem toList_flatMap_of_pure {α α₂ : Type w} {β : Type w}
     [Finite α Id] [Finite α₂ Id]
     [IteratorToArray α Id] [IteratorToArray α₂ Id]
     [LawfulIteratorToArray α Id] [LawfulIteratorToArray α₂ Id]
-    {f : β → Iter (α := α₂) Id γ} {it : Iter (α := α) Id β} :
+    {f : β → IterM (α := α₂) Id γ} {it : IterM (α := α) Id β} :
     (it.flatMap f).toList = it.toList.flatMap (fun b => (f b).toList) := by
-  induction it using Iter.induct with | step it ihy ihs =>
-  rw [toList_flatMap_of_stepH, Iter.toList_of_step]
-  simp only [Id.pure_eq, Id.bind_eq, Iter.step, Id.map_eq]
+  induction it using IterM.induct with | step it ihy ihs =>
+  rw [toList_flatMap_of_stepH, IterM.toList_of_step]
+  simp only [Id.pure_eq, Id.bind_eq, IterM.step, Id.map_eq]
   generalize it.stepH.inflate = step
   match step with
   | .yield it' out h =>

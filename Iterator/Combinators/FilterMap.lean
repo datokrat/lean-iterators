@@ -12,9 +12,9 @@ import Iterator.HetT
 /-!
 This file provides iterator combinators for filtering and mapping.
 
-* `Iter.filterMap` either modifies or drops each value based on an option-valued mapping function.
-* `Iter.filter` drops some elements based on a predicate.
-* `Iter.map` modifies each value based on a mapping function
+* `IterM.filterMap` either modifies or drops each value based on an option-valued mapping function.
+* `IterM.filter` drops some elements based on a predicate.
+* `IterM.map` modifies each value based on a mapping function
 
 Several variants of these combinators are provided:
 
@@ -29,7 +29,7 @@ universe u' v' u v
 @[ext]
 structure FilterMapMH (α : Type w) {β : Type v} {γ : Type v'}
     {m : Type w → Type w'} (f : β → HetT m (Option γ)) where
-  inner : Iter (α := α) m β
+  inner : IterM (α := α) m β
 
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {γ : Type v'}
     [Monad m] [Iterator α m β] {f : β → HetT m (Option γ)}
@@ -58,15 +58,15 @@ it.filterMapMH     ---a'-----c'-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMapMH [Monad m] [Iterator α m β] (f : β → HetT m (Option γ))
-    (it : Iter (α := α) m β) : Iter (α := FilterMapMH α f) m γ :=
+def IterM.filterMapMH [Monad m] [Iterator α m β] (f : β → HetT m (Option γ))
+    (it : IterM (α := α) m β) : IterM (α := FilterMapMH α f) m γ :=
   toIter ⟨it⟩ m γ
 
 def MapMH (α : Type w) {β : Type v} {γ : Type v'} {m : Type w → Type w'} [Functor m]
     (f : β → HetT m γ) :=
   FilterMapMH α (fun b => HetT.mapH some (f b))
 
-inductive FilterMapMH.PlausibleStep (it : Iter (α := FilterMapMH α f) m γ) : (step : IterStep (Iter (α := FilterMapMH α f) m γ) γ) → Prop where
+inductive FilterMapMH.PlausibleStep (it : IterM (α := FilterMapMH α f) m γ) : (step : IterStep (IterM (α := FilterMapMH α f) m γ) γ) → Prop where
   | yieldNone : ∀ {it' out}, it.inner.inner.plausible_step (.yield it' out) →
       (f out).property none → PlausibleStep it (.skip (it'.filterMapMH f))
   | yieldSome : ∀ {it' out out'}, it.inner.inner.plausible_step (.yield it' out) →
@@ -74,8 +74,8 @@ inductive FilterMapMH.PlausibleStep (it : Iter (α := FilterMapMH α f) m γ) : 
   | skip : ∀ {it'}, it.inner.inner.plausible_step (.skip it') → PlausibleStep it (.skip (it'.filterMapMH f))
   | done : it.inner.inner.plausible_step .done → PlausibleStep it .done
 
-def FilterMapMH.step (it : Iter (α := FilterMapMH α f) m γ) :
-    HetT m (IterStep (Iter (α := FilterMapMH α f) m γ) γ) := do
+def FilterMapMH.step (it : IterM (α := FilterMapMH α f) m γ) :
+    HetT m (IterStep (IterM (α := FilterMapMH α f) m γ) γ) := do
   it.inner.inner.stepHet.bindH fun
   | .yield it' out => (f out).bindH fun
       | none => pure <| .skip (it'.filterMapMH f)
@@ -83,7 +83,7 @@ def FilterMapMH.step (it : Iter (α := FilterMapMH α f) m γ) :
   | .skip it' => pure <| .skip (it'.filterMapMH f)
   | .done => pure <| .done
 
-theorem FilterMapMH.PlausibleStep.char {it : Iter (α := FilterMapMH α f) m γ} :
+theorem FilterMapMH.PlausibleStep.char {it : IterM (α := FilterMapMH α f) m γ} :
     FilterMapMH.PlausibleStep it = (FilterMapMH.step it).property := by
   ext step
   simp only [FilterMapMH.step, HetT.bindH]
@@ -116,7 +116,7 @@ theorem FilterMapMH.PlausibleStep.char {it : Iter (α := FilterMapMH α f) m γ}
       cases h
       exact .done hp
 
-instance [Monad m] {it : Iter (α := FilterMapMH α f) m γ} :
+instance [Monad m] {it : IterM (α := FilterMapMH α f) m γ} :
     Small.{w} (Subtype <| FilterMapMH.PlausibleStep it) := by
   rw [FilterMapMH.PlausibleStep.char]
   exact (FilterMapMH.step it).small
@@ -140,20 +140,20 @@ instance {f : β → HetT m γ} :
   inferInstanceAs <| Iterator (FilterMapMH α _) m γ
 
 instance FilterMapMH.instFinitenessRelation [Finite α m] : FinitenessRelation (FilterMapMH α f) m where
-  rel := InvImage Iter.plausible_successor_of (FilterMapMH.inner ∘ Iter.inner)
+  rel := InvImage IterM.plausible_successor_of (FilterMapMH.inner ∘ IterM.inner)
   wf := InvImage.wf _ Finite.wf
   subrelation {it it'} h := by
     obtain ⟨step, h, h'⟩ := h
     cases h'
     case yieldNone it' out h' h'' =>
       cases h
-      exact Iter.plausible_successor_of_yield h'
+      exact IterM.plausible_successor_of_yield h'
     case yieldSome it' out h' h'' =>
       cases h
-      exact Iter.plausible_successor_of_yield h'
+      exact IterM.plausible_successor_of_yield h'
     case skip it' h' =>
       cases h
-      exact Iter.plausible_successor_of_skip h'
+      exact IterM.plausible_successor_of_skip h'
     case done h' =>
       cases h
 
@@ -163,7 +163,7 @@ instance {f : β → HetT m γ} [Finite α m] :
 
 instance {f : β → HetT m γ} [Productive α m] :
     ProductivenessRelation (MapMH α f) m where
-  rel := InvImage Iter.plausible_skip_successor_of (FilterMapMH.inner ∘ Iter.inner)
+  rel := InvImage IterM.plausible_skip_successor_of (FilterMapMH.inner ∘ IterM.inner)
   wf := InvImage.wf _ Productive.wf
   subrelation {it it'} h := by
     cases h
@@ -221,8 +221,8 @@ _TODO_: prove `Productive`. This requires us to wrap the FilterMapMH into a new 
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.mapMH [Monad m] [Iterator α m β] (f : β → HetT m γ) (it : Iter (α := α) m β) :
-    Iter (α := MapMH α f) m γ :=
+def IterM.mapMH [Monad m] [Iterator α m β] (f : β → HetT m γ) (it : IterM (α := α) m β) :
+    IterM (α := MapMH α f) m γ :=
   toIter ⟨it⟩ m γ
 
 /--
@@ -249,8 +249,8 @@ it.filterMH        ---a-----c-------⊥
 This combinator incurs an additional O(1) cost with each output of `it` in addition to the cost of the monadic effects.
 -/
 @[inline]
-def Iter.filterMH [Monad m] [Iterator α m β] (f : β → HetT m Bool) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (fun b => (f b).mapH (fun x => if x = true then some b else none)) : Iter m β)
+def IterM.filterMH [Monad m] [Iterator α m β] (f : β → HetT m Bool) (it : IterM (α := α) m β) :=
+  (it.filterMapMH (fun b => (f b).mapH (fun x => if x = true then some b else none)) : IterM m β)
 
 end FilterMapMH
 
@@ -262,12 +262,12 @@ variable {α : Type w} {β : Type v} {m : Type w → Type w'} [Monad m] [Iterato
     {γ : Type v'} {f : β → Option γ} [Small.{w} γ]
 
 @[inline]
-def Iter.filterMapH (f : β → Option γ) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (fun b => pure (f b)) : Iter m γ)
+def IterM.filterMapH (f : β → Option γ) (it : IterM (α := α) m β) :=
+  (it.filterMapMH (fun b => pure (f b)) : IterM m γ)
 
 @[inline]
-def Iter.mapH (f : β → γ) (it : Iter (α := α) m β) :=
-  (it.mapMH (fun b => pure (f b)) : Iter m γ)
+def IterM.mapH (f : β → γ) (it : IterM (α := α) m β) :=
+  (it.mapMH (fun b => pure (f b)) : IterM m γ)
 
 end FilterMapH
 
@@ -276,16 +276,16 @@ section FilterMap
 variable {m : Type w → Type w'} {α : Type w} {β : Type v} {γ : Type w} {f : β → Option γ}
 
 @[inline]
-def Iter.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : Iter (α := α) m β) :=
-  (it.filterMapH f : Iter m γ)
+def IterM.filterMap [Iterator α m β] [Monad m] (f : β → Option γ) (it : IterM (α := α) m β) :=
+  (it.filterMapH f : IterM m γ)
 
 @[inline]
-def Iter.map [Iterator α m β] [Monad m] (f : β → γ) (it : Iter (α := α) m β) :=
-  (it.mapH f : Iter m γ)
+def IterM.map [Iterator α m β] [Monad m] (f : β → γ) (it : IterM (α := α) m β) :=
+  (it.mapH f : IterM m γ)
 
 @[inline]
-def Iter.filter [Iterator α m β] [Monad m] (f : β → Bool) (it : Iter (α := α) m β) :=
-  (it.filterMapH (fun b => if f b then some b else none) : Iter m β)
+def IterM.filter [Iterator α m β] [Monad m] (f : β → Bool) (it : IterM (α := α) m β) :=
+  (it.filterMapH (fun b => if f b then some b else none) : IterM m β)
 
 end FilterMap
 
@@ -294,15 +294,15 @@ section FilterMapM
 variable {m : Type w → Type w'} {α : Type w} {β : Type v} {γ : Type w} {f : β → Option γ}
 
 @[inline]
-def Iter.filterMapM [Iterator α m β] [Monad m] (f : β → m (Option γ)) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (fun b => monadLift (f b)) : Iter m γ)
+def IterM.filterMapM [Iterator α m β] [Monad m] (f : β → m (Option γ)) (it : IterM (α := α) m β) :=
+  (it.filterMapMH (fun b => monadLift (f b)) : IterM m γ)
 
 @[inline]
-def Iter.mapM [Iterator α m β] [Monad m] (f : β → m γ) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (fun b => some <$> monadLift (f b)) : Iter m γ)
+def IterM.mapM [Iterator α m β] [Monad m] (f : β → m γ) (it : IterM (α := α) m β) :=
+  (it.filterMapMH (fun b => some <$> monadLift (f b)) : IterM m γ)
 
 @[inline]
-def Iter.filterM [Iterator α m β] [Monad m] (f : β → m (USquash Bool)) (it : Iter (α := α) m β) :=
-  (it.filterMapMH (fun b => (HetT.liftSquashed (f b)).mapH (if · = true then some b else none)) : Iter m β)
+def IterM.filterM [Iterator α m β] [Monad m] (f : β → m (USquash Bool)) (it : IterM (α := α) m β) :=
+  (it.filterMapMH (fun b => (HetT.liftSquashed (f b)).mapH (if · = true then some b else none)) : IterM m β)
 
 end FilterMapM

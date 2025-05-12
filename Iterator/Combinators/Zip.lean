@@ -17,12 +17,12 @@ variable {m : Type w → Type w'}
   {α₂ : Type w} {β₂ : Type v₂} [Iterator α₂ m β₂]
 
 structure ZipH (α₁ : Type w) (m : Type w → Type w') {β₁ : Type v₁} [Iterator α₁ m β₁] (α₂ : Type w) (β₂ : Type v₂) where
-  left : Iter (α := α₁) m β₁
-  memoizedLeft : USquash.{w} (Option { out : β₁ // ∃ it : Iter (α := α₁) m β₁, it.plausible_output out })
-  right : Iter (α := α₂) m β₂
+  left : IterM (α := α₁) m β₁
+  memoizedLeft : USquash.{w} (Option { out : β₁ // ∃ it : IterM (α := α₁) m β₁, it.plausible_output out })
+  right : IterM (α := α₂) m β₂
 
-inductive ZipH.PlausibleStep (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
-    IterStep (Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) (β₁ × β₂) → Prop where
+inductive ZipH.PlausibleStep (it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
+    IterStep (IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) (β₁ × β₂) → Prop where
   | yieldLeft (hm : it.inner.memoizedLeft.inflate = none) {it' out} (hp : it.inner.left.plausible_step (.yield it' out)) :
       PlausibleStep it (.skip ⟨⟨it', .deflate (some ⟨out, _, _, hp⟩), it.inner.right⟩⟩)
   | skipLeft (hm : it.inner.memoizedLeft.inflate = none) {it'} (hp : it.inner.left.plausible_step (.skip it')) :
@@ -36,8 +36,8 @@ inductive ZipH.PlausibleStep (it : Iter (α := ZipH α₁ m α₂ β₂) m (β�
   | doneRight {out₁} (hm : it.inner.memoizedLeft.inflate = some out₁) (hp : it.inner.right.plausible_step .done) :
       PlausibleStep it .done
 
-def ZipH.step [Monad m] (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
-    HetT m (IterStep (Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) (β₁ × β₂)) :=
+def ZipH.step [Monad m] (it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
+    HetT m (IterStep (IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) (β₁ × β₂)) :=
   match it.inner.memoizedLeft.inflate with
   | none => it.inner.left.stepHet.pbindH fun
       | ⟨.yield it₁' out, hp⟩ => pure <| .skip ⟨⟨it₁', .deflate (some ⟨out, _, _, hp⟩), it.inner.right⟩⟩
@@ -48,7 +48,7 @@ def ZipH.step [Monad m] (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × 
       | .skip it₂' => pure <| .skip ⟨⟨it.inner.left, .deflate (some out₁), it₂'⟩⟩
       | .done => pure <| .done
 
-theorem ZipH.PlausibleStep.char [Monad m] (it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
+theorem ZipH.PlausibleStep.char [Monad m] (it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)) :
     ZipH.PlausibleStep it = (ZipH.step it).property := by
   ext step
   simp only [ZipH.step]
@@ -100,7 +100,7 @@ theorem ZipH.PlausibleStep.char [Monad m] (it : Iter (α := ZipH α₁ m α₂ �
         cases h
         exact .doneRight ‹_› hp
 
-instance [Monad m] {it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)} :
+instance [Monad m] {it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)} :
     Small.{w} (Subtype <| ZipH.PlausibleStep it) := by
   rw [ZipH.PlausibleStep.char]
   exact (ZipH.step it).small
@@ -129,9 +129,9 @@ instance ZipH.instIterator [Monad m] :
           pure <| .deflate <| .done (.doneRight hm hp)
 
 @[inline]
-def Iter.zipH [Monad m]
-    (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :
-    Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) :=
+def IterM.zipH [Monad m]
+    (left : IterM (α := α₁) m β₁) (right : IterM (α := α₂) m β₂) :
+    IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) :=
   toIter ⟨left, .deflate none, right⟩ m _
 
 -- TODO: put this into core. This is also duplicated in FlatMap
@@ -156,24 +156,24 @@ theorem ZipH.wellFounded_optionLt {α} {rel : α → α → Prop} (h : WellFound
 
 variable (m) in
 def ZipH.rel₁ [Finite α₁ m] [Productive α₂ m] :
-    Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Prop :=
+    IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Prop :=
   InvImage (Prod.Lex
-      Iter.TerminationMeasures.Finite.rel
-      (Prod.Lex (Option.lt emptyRelation) Iter.TerminationMeasures.Productive.rel))
+      IterM.TerminationMeasures.Finite.rel
+      (Prod.Lex (Option.lt emptyRelation) IterM.TerminationMeasures.Productive.rel))
     (fun it => (it.inner.left.finitelyManySteps, (it.inner.memoizedLeft.inflate, it.inner.right.finitelyManySkips)))
 
-theorem ZipH.rel₁_of_left [Finite α₁ m] [Productive α₂ m] {it' it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)}
+theorem ZipH.rel₁_of_left [Finite α₁ m] [Productive α₂ m] {it' it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)}
     (h : it'.inner.left.finitelyManySteps.rel it.inner.left.finitelyManySteps) : ZipH.rel₁ m it' it :=
   Prod.Lex.left _ _ h
 
 theorem ZipH.rel₁_of_memoizedLeft [Finite α₁ m] [Productive α₂ m]
-    {left : Iter (α := α₁) m β₁} {b' b} {right' right : Iter (α := α₂) m β₂}
+    {left : IterM (α := α₁) m β₁} {b' b} {right' right : IterM (α := α₂) m β₂}
     (h : Option.lt emptyRelation b'.inflate b.inflate) :
     ZipH.rel₁ m ⟨left, b', right'⟩ ⟨left, b, right⟩ :=
   Prod.Lex.right _ <| Prod.Lex.left _ _ (by simp only [USquash.inflate_deflate]; exact h)
 
 theorem ZipH.rel₁_of_right [Finite α₁ m] [Productive α₂ m]
-    {left : Iter (α := α₁) m β₁} {b b' : _} {it' it : Iter (α := α₂) m β₂}
+    {left : IterM (α := α₁) m β₁} {b b' : _} {it' it : IterM (α := α₂) m β₂}
     (h : b.inflate = b'.inflate)
     (h' : it'.finitelyManySkips.rel it.finitelyManySkips) :
     ZipH.rel₁ m ⟨left, b, it'⟩ ⟨left, b', it⟩ := by
@@ -197,11 +197,11 @@ instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
     case yieldLeft hm it' out hp =>
       cases h
       apply ZipH.rel₁_of_left
-      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
+      exact IterM.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skipLeft hm it' hp =>
       cases h
       apply ZipH.rel₁_of_left
-      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
+      exact IterM.TerminationMeasures.Finite.rel_of_skip ‹_›
     case doneLeft hm hp =>
       cases h
     case yieldRight out₁ hm it₂' out₂ hp =>
@@ -212,7 +212,7 @@ instance [Monad m] [Finite α₁ m] [Productive α₂ m] :
       cases h
       apply ZipH.rel₁_of_right
       · simp_all
-      · exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›
+      · exact IterM.TerminationMeasures.Productive.rel_of_skip ‹_›
     case doneRight out₁ hm hp =>
       cases h
 
@@ -241,24 +241,24 @@ theorem ZipH.wellFounded_lt_with_top {α} {r : α → α → Prop} (h : WellFoun
 
 variable (m) in
 def ZipH.rel₂ [Productive α₁ m] [Finite α₂ m] :
-    Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Prop :=
+    IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂) → Prop :=
   InvImage (Prod.Lex
-      Iter.TerminationMeasures.Finite.rel
-      (Prod.Lex (ZipH.lt_with_top emptyRelation) Iter.TerminationMeasures.Productive.rel))
+      IterM.TerminationMeasures.Finite.rel
+      (Prod.Lex (ZipH.lt_with_top emptyRelation) IterM.TerminationMeasures.Productive.rel))
     (fun it => (it.inner.right.finitelyManySteps, (it.inner.memoizedLeft.inflate, it.inner.left.finitelyManySkips)))
 
-theorem ZipH.rel₂_of_right [Productive α₁ m] [Finite α₂ m] {it' it : Iter (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)}
+theorem ZipH.rel₂_of_right [Productive α₁ m] [Finite α₂ m] {it' it : IterM (α := ZipH α₁ m α₂ β₂) m (β₁ × β₂)}
     (h : it'.inner.right.finitelyManySteps.rel it.inner.right.finitelyManySteps) : ZipH.rel₂ m it' it :=
   Prod.Lex.left _ _ h
 
 theorem ZipH.rel₂_of_memoizedLeft [Productive α₁ m] [Finite α₂ m]
-    {right : Iter (α := α₂) m β₂} {b' b} {left' left : Iter (α := α₁) m β₁}
+    {right : IterM (α := α₂) m β₂} {b' b} {left' left : IterM (α := α₁) m β₁}
     (h : lt_with_top emptyRelation b'.inflate b.inflate) :
     ZipH.rel₂ m ⟨left, b', right⟩ ⟨left', b, right⟩ :=
   Prod.Lex.right _ <| Prod.Lex.left _ _ (by simp only [USquash.inflate_deflate]; exact h)
 
 theorem ZipH.rel₂_of_left [Productive α₁ m] [Finite α₂ m]
-    {right : Iter (α := α₂) m β₂} {b b' : _} {it' it : Iter (α := α₁) m β₁}
+    {right : IterM (α := α₂) m β₂} {b b' : _} {it' it : IterM (α := α₁) m β₁}
     (h : b.inflate = b'.inflate)
     (h' : it'.finitelyManySkips.rel it.finitelyManySkips) :
     ZipH.rel₂ m ⟨it', b, right⟩ ⟨it, b', right⟩ := by
@@ -287,17 +287,17 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
       cases h
       apply ZipH.rel₂_of_left
       · simp_all
-      · exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›
+      · exact IterM.TerminationMeasures.Productive.rel_of_skip ‹_›
     case doneLeft hm hp =>
       cases h
     case yieldRight out₁ hm it₂' out₂ hp =>
       cases h
       apply ZipH.rel₂_of_right
-      exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
+      exact IterM.TerminationMeasures.Finite.rel_of_yield ‹_›
     case skipRight out₁ hm it₂' hp =>
       cases h
       apply ZipH.rel₂_of_right
-      exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›
+      exact IterM.TerminationMeasures.Finite.rel_of_skip ‹_›
     case doneRight out₁ hm hp =>
       cases h
 
@@ -346,8 +346,8 @@ _TODO:_ implement the `Productive` instance
 
 This combinator incurs an additional O(1) cost with each output of `left` or `right`.
 -/
-def Iter.zip
-    (left : Iter (α := α₁) m β₁) (right : Iter (α := α₂) m β₂) :=
-  (Iter.zipH left right : Iter m (β₁ × β₂))
+def IterM.zip
+    (left : IterM (α := α₁) m β₁) (right : IterM (α := α₂) m β₂) :=
+  (IterM.zipH left right : IterM m (β₁ × β₂))
 
 end Zip

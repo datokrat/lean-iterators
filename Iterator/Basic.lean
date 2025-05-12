@@ -23,7 +23,7 @@ Most users of the iterator API will just put together existing library functions
 create, combine and consumer iterators. Consider a simple example:
 
 ```lean
--- [1, 2, 3].iter : Iter Id Nat (with implicit argument α := ListIterator α)
+-- [1, 2, 3].iter : IterM Id Nat (with implicit argument α := ListIterator α)
 #check [1, 2, 3].iter
 
 #eval [1, 2, 3].iter.step
@@ -34,7 +34,7 @@ create, combine and consumer iterators. Consider a simple example:
 
 Generally, an iterator is an element of an arbitrary type `α` that has an
 `Iterator α m β` instance. Here, `m` is a monad and `β` is the type of out put values that
-the iterator spits out. `Iter {α} m β` is just a wrapper around such `α` and it provides
+the iterator spits out. `IterM {α} m β` is just a wrapper around such `α` and it provides
 many convenience functions that are available in field notation.
 
 The heart of every iterator is its `step` function, which returns `m (IterStep α β ..)`.
@@ -70,7 +70,7 @@ loops (stream fusion).
 ### Basic iterator API
 
 * This file, `Iterator.Basic`, contains the definition of `Iterator`, `Finite` and `Productive`.
-* `Iterator.Wrapper` defines the convenience wrapper structure `Iter {α} m β`.
+* `Iterator.Wrapper` defines the convenience wrapper structure `IterM {α} m β`.
 * Producers (i.e., `.iter` methods for various data types) are provided in `Iterator.Producers`.
 * Combinators (i.e., ways to build new iterators out of existing ones) are provided in
   `Iterator.Combinators`.
@@ -104,7 +104,7 @@ changes are necessary, this disclaimer will be removed.
   monadic setting.
 -/
 
-structure Iter {α : Type w} (m : Type w → Type w') (β : Type v) : Type w where
+structure IterM {α : Type w} (m : Type w → Type w') (β : Type v) : Type w where
   inner : α
 
 section IterStep
@@ -227,31 +227,22 @@ end IterStep
 --   -- simp only [map]
 --   -- cases it <;> simp
 
-/-
-Options:
-1. α : Type w; create a SmallIterator class. Problem of β remains!
-2. basically use the `OverT` construction in `Iterator` (2b: have `Iterator` be universe-uniform) and require both α and β to be small (in `Iter`). Sad: complicated signatures. Equality might become difficult to ensure.
-3. bundle smallness of α and β in `Iter`, let `Iterator` be universe-uniform. Problem: we rely heavily on optimizations.
-4. parametrize `step` over smallness instances
-5. `coherent_step`
-6. ULower-powered Prop-values UnivLE
--/
 class Iterator (α : Type w) (m : Type w → Type w') (β : outParam (Type v)) where
-  plausible_step : Iter (α := α) m β → IterStep (Iter (α := α) m β) β → Prop
+  plausible_step : IterM (α := α) m β → IterStep (IterM (α := α) m β) β → Prop
   step_small : Small.{w} (PlausibleIterStep <| plausible_step it)
-  step : (it : Iter (α := α) m β) → m (USquash <| PlausibleIterStep <| plausible_step it)
+  step : (it : IterM (α := α) m β) → m (USquash <| PlausibleIterStep <| plausible_step it)
 
-instance (α : Type w) (m : Type w → Type w') (β : Type v) [Iterator α m β] (it : Iter (α := α) m β) :
+instance (α : Type w) (m : Type w → Type w') (β : Type v) [Iterator α m β] (it : IterM (α := α) m β) :
     Small.{w} (PlausibleIterStep (Iterator.plausible_step it)) :=
   Iterator.step_small
 
 @[always_inline, inline]
 def toIter {α : Type w} (it : α) (m : Type w → Type w') (β : Type v) :
-    Iter (α := α) m β :=
+    IterM (α := α) m β :=
   ⟨it⟩
 
 @[simp]
-theorem toIter_inner {α m β} (it : Iter (α := α) m β) :
+theorem toIter_inner {α m β} (it : IterM (α := α) m β) :
     toIter it.inner m β = it :=
   rfl
 
@@ -260,87 +251,87 @@ theorem inner_toIter {α m β} (it : α) :
     (toIter it m β).inner = it :=
   rfl
 
-abbrev Iter.plausible_step {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
-    Iter (α := α) m β → IterStep (Iter (α := α) m β) β → Prop :=
+abbrev IterM.plausible_step {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
+    IterM (α := α) m β → IterStep (IterM (α := α) m β) β → Prop :=
   Iterator.plausible_step (α := α) (m := m)
 
-abbrev Iter.Step {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it : Iter (α := α) m β) :=
+abbrev IterM.Step {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : IterM (α := α) m β) :=
   PlausibleIterStep it.plausible_step
 
-def Iter.plausible_output {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it : Iter (α := α) m β) (out : β) : Prop :=
+def IterM.plausible_output {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : IterM (α := α) m β) (out : β) : Prop :=
   ∃ it', it.plausible_step (.yield it' out)
 
-instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {it : Iter (α := α) m β} :
+instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] {it : IterM (α := α) m β} :
     Small.{w} (Subtype it.plausible_output) := sorry
 
 instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
-    Small.{w} (Subtype (∃ it : Iter (α := α) m β, it.plausible_output ·)) := sorry
+    Small.{w} (Subtype (∃ it : IterM (α := α) m β, it.plausible_output ·)) := sorry
 
-def Iter.plausible_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it' it : Iter (α := α) m β) : Prop :=
+def IterM.plausible_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it' it : IterM (α := α) m β) : Prop :=
   ∃ step, step.successor = some it' ∧ it.plausible_step step
 
-def Iter.plausible_skip_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it' it : Iter (α := α) m β) : Prop :=
+def IterM.plausible_skip_successor_of {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it' it : IterM (α := α) m β) : Prop :=
   it.plausible_step (.skip it')
 
-def Iter.stepH {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it : Iter (α := α) m β) : m (USquash <| it.Step) :=
+def IterM.stepH {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : IterM (α := α) m β) : m (USquash <| it.Step) :=
   Iterator.step it
 
-def Iter.stepHet {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    (it : Iter (α := α) m β) : HetT m (IterStep (Iter (α := α) m β) β) :=
+def IterM.stepHet {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    (it : IterM (α := α) m β) : HetT m (IterStep (IterM (α := α) m β) β) :=
   ⟨it.plausible_step, Iterator.step_small, it.stepH⟩
 
-def Iter.step {α : Type w} {m : Type w → Type w'} {β : Type w} [Iterator α m β] [Functor m]
-    (it : Iter (α := α) m β) : m it.Step :=
+def IterM.step {α : Type w} {m : Type w → Type w'} {β : Type w} [Iterator α m β] [Functor m]
+    (it : IterM (α := α) m β) : m it.Step :=
   USquash.inflate <$> it.stepH
 
 section Finite
 
 class Finite (α m) [Iterator α m β] : Prop where
-  wf : WellFounded (Iter.plausible_successor_of (α := α) (m := m))
+  wf : WellFounded (IterM.plausible_successor_of (α := α) (m := m))
 
-structure Iter.TerminationMeasures.Finite
+structure IterM.TerminationMeasures.Finite
     (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] where
-  it : Iter (α := α) m β
+  it : IterM (α := α) m β
 
-def Iter.TerminationMeasures.Finite.rel
+def IterM.TerminationMeasures.Finite.rel
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
     TerminationMeasures.Finite α m → TerminationMeasures.Finite α m → Prop :=
-  Relation.TransGen <| InvImage Iter.plausible_successor_of Iter.TerminationMeasures.Finite.it
+  Relation.TransGen <| InvImage IterM.plausible_successor_of IterM.TerminationMeasures.Finite.it
 
 instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    [Finite α m] : WellFoundedRelation (Iter.TerminationMeasures.Finite α m) where
-  rel := Iter.TerminationMeasures.Finite.rel
+    [Finite α m] : WellFoundedRelation (IterM.TerminationMeasures.Finite α m) where
+  rel := IterM.TerminationMeasures.Finite.rel
   wf := (InvImage.wf _ Finite.wf).transGen
 
-def Iter.finitelyManySteps {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    [Finite α m] (it : Iter (α := α) m β) : Iter.TerminationMeasures.Finite α m :=
+def IterM.finitelyManySteps {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    [Finite α m] (it : IterM (α := α) m β) : IterM.TerminationMeasures.Finite α m :=
   ⟨it⟩
 
-theorem Iter.TerminationMeasures.Finite.rel_of_yield
+theorem IterM.TerminationMeasures.Finite.rel_of_yield
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    {it it' : Iter (α := α) m β} {out : β} (h : it.plausible_step (.yield it' out)) :
+    {it it' : IterM (α := α) m β} {out : β} (h : it.plausible_step (.yield it' out)) :
     rel ⟨it'⟩ ⟨it⟩ := by
   exact .single ⟨_, rfl, h⟩
 
-theorem Iter.TerminationMeasures.Finite.rel_of_skip
+theorem IterM.TerminationMeasures.Finite.rel_of_skip
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    {it it' : Iter (α := α) m β} (h : it.plausible_step (.skip it')) :
+    {it it' : IterM (α := α) m β} (h : it.plausible_step (.skip it')) :
     rel ⟨it'⟩ ⟨it⟩ := by
   exact .single ⟨_, rfl, h⟩
 
 macro_rules | `(tactic| decreasing_trivial) => `(tactic|
   first
-  | exact Iter.TerminationMeasures.Finite.rel_of_yield ‹_›
-  | exact Iter.TerminationMeasures.Finite.rel_of_skip ‹_›)
+  | exact IterM.TerminationMeasures.Finite.rel_of_yield ‹_›
+  | exact IterM.TerminationMeasures.Finite.rel_of_skip ‹_›)
 
 variable (α m) in
 class FinitenessRelation [Iterator α m β] where
-  rel : (Iter (α := α) m β) → (Iter (α := α) m β) → Prop
+  rel : (IterM (α := α) m β) → (IterM (α := α) m β) → Prop
   wf : WellFounded rel
   subrelation : ∀ {it it'}, it'.plausible_successor_of it → rel it' it
 
@@ -353,14 +344,14 @@ instance [Iterator α m β] [FinitenessRelation α m] : Finite α m where
     · apply InvImage.wf
       exact FinitenessRelation.wf
 
-theorem Iter.plausible_successor_of_yield
+theorem IterM.plausible_successor_of_yield
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    {it' it : Iter (α := α) m β} {out : β} (h : it.plausible_step (.yield it' out)) :
+    {it' it : IterM (α := α) m β} {out : β} (h : it.plausible_step (.yield it' out)) :
     it'.plausible_successor_of it :=
   ⟨_, rfl, h⟩
 
-theorem Iter.plausible_successor_of_skip
-    {α m β} [Iterator α m β] {it it' : Iter (α := α) m β}
+theorem IterM.plausible_successor_of_skip
+    {α m β} [Iterator α m β] {it it' : IterM (α := α) m β}
     (h : it.plausible_step (.skip it')) :
     it'.plausible_successor_of it :=
   ⟨_, rfl, h⟩
@@ -370,38 +361,38 @@ end Finite
 section Productive
 
 class Productive (α m) {β} [Iterator α m β] : Prop where
-  wf : WellFounded (Iter.plausible_skip_successor_of (α := α) (m := m))
+  wf : WellFounded (IterM.plausible_skip_successor_of (α := α) (m := m))
 
-structure Iter.TerminationMeasures.Productive
+structure IterM.TerminationMeasures.Productive
     (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] where
-  it : Iter (α := α) m β
+  it : IterM (α := α) m β
 
-def Iter.TerminationMeasures.Productive.rel
+def IterM.TerminationMeasures.Productive.rel
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β] :
     TerminationMeasures.Productive α m → TerminationMeasures.Productive α m → Prop :=
-  Relation.TransGen <| InvImage Iter.plausible_skip_successor_of Iter.TerminationMeasures.Productive.it
+  Relation.TransGen <| InvImage IterM.plausible_skip_successor_of IterM.TerminationMeasures.Productive.it
 
 instance {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    [Productive α m] : WellFoundedRelation (Iter.TerminationMeasures.Productive α m) where
-  rel := Iter.TerminationMeasures.Productive.rel
+    [Productive α m] : WellFoundedRelation (IterM.TerminationMeasures.Productive α m) where
+  rel := IterM.TerminationMeasures.Productive.rel
   wf := (InvImage.wf _ Productive.wf).transGen
 
-def Iter.finitelyManySkips {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    [Productive α m] (it : Iter (α := α) m β) : Iter.TerminationMeasures.Productive α m :=
+def IterM.finitelyManySkips {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
+    [Productive α m] (it : IterM (α := α) m β) : IterM.TerminationMeasures.Productive α m :=
   ⟨it⟩
 
-theorem Iter.TerminationMeasures.Productive.rel_of_skip
+theorem IterM.TerminationMeasures.Productive.rel_of_skip
     {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
-    {it it' : Iter (α := α) m β} (h : it.plausible_step (.skip it')) :
+    {it it' : IterM (α := α) m β} (h : it.plausible_step (.skip it')) :
     rel ⟨it'⟩ ⟨it⟩ :=
   .single h
 
 macro_rules | `(tactic| decreasing_trivial) => `(tactic|
-  exact Iter.TerminationMeasures.Productive.rel_of_skip ‹_›)
+  exact IterM.TerminationMeasures.Productive.rel_of_skip ‹_›)
 
 variable (α m) in
 class ProductivenessRelation [Iterator α m β] where
-  rel : (Iter (α := α) m β) → (Iter (α := α) m β) → Prop
+  rel : (IterM (α := α) m β) → (IterM (α := α) m β) → Prop
   wf : WellFounded rel
   subrelation : ∀ {it it'}, it'.plausible_skip_successor_of it → rel it' it
 
@@ -416,74 +407,9 @@ instance [Iterator α m β] [ProductivenessRelation α m] : Productive α m wher
 
 instance [Iterator α m β] [Finite α m] : Productive α m where
   wf := by
-    apply Subrelation.wf (r := Iter.plausible_successor_of)
+    apply Subrelation.wf (r := IterM.plausible_successor_of)
     · intro it' it h
-      exact Iter.plausible_successor_of_skip h
+      exact IterM.plausible_successor_of_skip h
     · exact Finite.wf
 
 end Productive
-
--- def matchStep {α β γ} (yield : α → β → γ) (skip : α → γ) (done : γ) (step : IterStep α β) : γ :=
---   match step with
---   | .yield it out => yield it out
---   | .skip it => skip it
---   | .done => done
-
--- def matchStepD {α β γ} (step : IterStep α β)
---     (yield : (it : α) → (out : β) → step = .yield it out → γ)
---     (skip : (it : α) → step = .skip it → γ) (done : step = .done → γ) : γ :=
---   match step with
---   | .yield it out => yield it out rfl
---   | .skip it => skip it rfl
---   | .done => done rfl
-
--- inductive MatchStepVerificationCases {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
---     [Iterator α m β] (it : α) (yield : α → β → IterationT m γ) (skip : α → IterationT m γ)
---     (done : IterationT m γ) (x : γ) : Prop where
---   | yield {it' : α} {out : β} :
---     Iterator.plausible_step m it (.yield it' out) →
---     (yield it' out).property x → MatchStepVerificationCases it yield skip done x
---   | skip {it' : α} :
---     Iterator.plausible_step m it (.skip it') →
---     (skip it').property x → MatchStepVerificationCases it yield skip done x
---   | done :
---     Iterator.plausible_step m it .done →
---     done.property x → MatchStepVerificationCases it yield skip done x
-
--- theorem successor_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x} {δ : Type y}
---     [Iterator α m β]
---     {it : α} {yield skip done}
---     {f : γ → δ} {x : δ}
---     (h : (IterationT.mapH f <| (Iterator.step (m := m) it).bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
---     MatchStepVerificationCases it (yield · · |>.mapH f) (skip · |>.mapH f) (done.mapH f) x := by
---   simp only [IterationT.mapH, IterationT.bindH, matchStep] at h
---   obtain ⟨c, rfl, _, h, h'⟩ := h
---   split at h
---   · exact .yield h' ⟨c, rfl, h⟩
---   · exact .skip h' ⟨c, rfl, h⟩
---   · exact .done h' ⟨c, rfl, h⟩
-
--- theorem successor_yield [Pure m] [Iterator α m β] {it₁ it₂ : α} {b : β} :
---     ((pure (.yield it₁ b) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
---       it₂ = it₁ := by
---   simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
--- theorem successor_skip [Pure m] [Iterator α m β] {it₁ it₂ : α} :
---     ((pure (.skip it₁) : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it₂) ↔
---       it₂ = it₁ := by
---   simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
--- theorem successor_done [Pure m] [Iterator α m β] {it: α} :
---     ((pure .done : IterationT m (IterStep α β)).mapH IterStep.successor).property (some it) ↔ False := by
---   simp [IterationT.mapH, Pure.pure, IterStep.successor]
-
--- theorem property_matchStepH {α : Type u} {m : Type w → Type w'} {β : Type v} {γ : Type x}
---     [Iterator α m β] {it : α} {yield skip done} {x : γ}
---     (h : (Iterator.step (m := m) it |>.bindH <| matchStep (γ := IterationT m γ) yield skip done).property x) :
---     MatchStepVerificationCases it yield skip done x := by
---   simp only [IterationT.bindH, matchStep] at h
---   obtain ⟨c, h, h'⟩ := h
---   split at h
---   · exact .yield h' h
---   · exact .skip h' h
---   · exact .done h' h

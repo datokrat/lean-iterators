@@ -1,22 +1,22 @@
 import Iterator.Basic
 
-structure Iter.PlausibilityMorphism (α α' : Type w) (m : Type w → Type w') {β : Type v}
+structure IterM.PlausibilityMorphism (α α' : Type w) (m : Type w → Type w') {β : Type v}
     [Iterator α m β] [Iterator α' m β] where
-  map : Iter (α := α) m β → Iter (α := α') m β
-  plausible_step_map : ∀ {it : Iter (α := α) m β} {step : IterStep (Iter (α := α) m β) β},
+  map : IterM (α := α) m β → IterM (α := α') m β
+  plausible_step_map : ∀ {it : IterM (α := α) m β} {step : IterStep (IterM (α := α) m β) β},
       (map it).plausible_step (step.map map id) ↔ it.plausible_step step
 
-def Iter.PlausibilityMorphism.mapStep {α α' : Type w} {m : Type w → Type w'} {β : Type v}
+def IterM.PlausibilityMorphism.mapStep {α α' : Type w} {m : Type w → Type w'} {β : Type v}
     [Iterator α m β] [Iterator α' m β] (φ : PlausibilityMorphism α α' m)
-    {it : Iter (α := α) m β} (step : it.Step) : (φ.map it).Step :=
+    {it : IterM (α := α) m β} (step : it.Step) : (φ.map it).Step :=
   ⟨step.1.map φ.map id, φ.plausible_step_map.mpr step.2⟩
 
-structure Iter.Morphism (α α' : Type w) (m : Type w → Type w') [Functor m] {β : Type v}
-    [Iterator α m β] [Iterator α' m β] extends Iter.PlausibilityMorphism α α' m where
-  stepH_hom : ∀ {it : Iter (α := α) m β},
+structure IterM.Morphism (α α' : Type w) (m : Type w → Type w') [Functor m] {β : Type v}
+    [Iterator α m β] [Iterator α' m β] extends IterM.PlausibilityMorphism α α' m where
+  stepH_hom : ∀ {it : IterM (α := α) m β},
       (.deflate <| toPlausibilityMorphism.mapStep ·.inflate) <$> it.stepH = (map it).stepH
 
-def Iter.Morphism.id (α : Type w) (m : Type w → Type w') [Functor m] [LawfulFunctor m] {β : Type v} [Iterator α m β] :
+def IterM.Morphism.id (α : Type w) (m : Type w → Type w') [Functor m] [LawfulFunctor m] {β : Type v} [Iterator α m β] :
     Morphism α α m where
   map it := it
   plausible_step_map {it step} := by
@@ -33,8 +33,8 @@ def Iter.Morphism.id (α : Type w) (m : Type w → Type w') [Functor m] [LawfulF
     obtain ⟨step, _⟩ := step
     cases step <;> simp
 
-def Iter.Morphism.copy {α α' : Type w} {m : Type w → Type w'} [Functor m] {β : Type v}
-    [Iterator α m β] [Iterator α' m β] (φ : Morphism α α' m) {f : Iter (α := α) m β → Iter (α := α') m β}
+def IterM.Morphism.copy {α α' : Type w} {m : Type w → Type w'} [Functor m] {β : Type v}
+    [Iterator α m β] [Iterator α' m β] (φ : Morphism α α' m) {f : IterM (α := α) m β → IterM (α := α') m β}
     (h : f = φ.map) : Morphism α α' m where
   map := f
   plausible_step_map := h ▸ φ.plausible_step_map
