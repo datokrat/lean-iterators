@@ -35,10 +35,6 @@ instance MonadLiftIterator.instIterator {_ : Iterator α m β} {_ : MonadLiftT m
     | .skip it' h => pure <| .deflate <| .skip ⟨⟨it'⟩⟩ (.skip h)
     | .done h => pure <| .deflate <| .done (.done h)
 
-instance MonadLiftIterator.instIteratorFor [Monad n] [Monad n'] [MonadLiftT n n'] {_ : Iterator α m β} {_ : MonadLiftT m n} :
-    IteratorFor (MonadLiftIterator α m n) n n' :=
-  .defaultImplementation
-
 instance {_ : Iterator α m β} [Finite α m] {_ : MonadLiftT m n} : FinitenessRelation (MonadLiftIterator α m n) n where
   rel := InvImage IterM.TerminationMeasures.Finite.rel fun it => it.inner.inner.finitelyManySteps
   wf := by
@@ -55,6 +51,11 @@ instance {_ : Iterator α m β} [Finite α m] {_ : MonadLiftT m n} : FinitenessR
       exact IterM.TerminationMeasures.Finite.rel_of_skip ‹_›
     case done h =>
       cases h
+
+instance MonadLiftIterator.instIteratorFor [Monad n] [Monad n'] [MonadLiftT n n']
+    [Iterator α m β] [Finite α m] {_ : MonadLiftT m n} :
+    IteratorFor (MonadLiftIterator α m n) n n' :=
+  .defaultImplementation
 
 variable (n) in
 @[always_inline, inline]

@@ -1,10 +1,9 @@
 import Iterator.Basic
 
-set_option trace.Elab.Tactic.monotonicity true in
 @[specialize]
 def IterM.DefaultConsumers.forIn {m : Type w → Type w'} {n : Type w → Type w''} [Monad n] [MonadLiftT m n]
-    {α : Type w} {β : Type v} {γ : Type w} [Nonempty (n γ)]
-    [Iterator α m β]
+    {α : Type w} {β : Type v} {γ : Type w}
+    [Iterator α m β] [Finite α m]
     (it : IterM (α := α) m β) (init : γ) {successor_of : β → γ → γ → Prop}
     (f : (b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value)) : n γ := do
   match (← it.stepH).inflate with
@@ -14,24 +13,25 @@ def IterM.DefaultConsumers.forIn {m : Type w → Type w'} {n : Type w → Type w
     | ⟨.done c, _⟩ => return c
   | .skip it' _ => IterM.DefaultConsumers.forIn it' init f
   | .done _ => return init
-partial_fixpoint
+termination_by it.finitelyManySteps
 
 class IteratorFor (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] (n : Type w → Type w'') where
   forIn : ∀ {γ : Type w}, IterM (α := α) m β → γ → {successor_of : β → γ → γ → Prop} →
       ((b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value)) →
-      (IterM.ForInWillTerminate α m successor_of) → n γ
+      n γ
 
 class LawfulIteratorFor (α : Type w) (m : Type w → Type w') (n : Type w → Type w'')
-    [Monad n] [Iterator α m β] [IteratorFor α m n] [MonadLiftT m n] where
+    [Monad n] [Iterator α m β] [Finite α m] [IteratorFor α m n] [MonadLiftT m n] where
   lawful : ∀ γ, IteratorFor.forIn (α := α) (m := m) (n := n) (γ := γ) =
     IterM.DefaultConsumers.forIn (α := α) (m := m) (n := n) (γ := γ)
 
 def IteratorFor.defaultImplementation {α : Type w} {m : Type w → Type w'} {n : Type w → Type w'}
-    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] : IteratorFor α m n where
+    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
+    IteratorFor α m n where
   forIn := IterM.DefaultConsumers.forIn
 
 instance (α : Type w) (m : Type w → Type w') (n : Type w → Type w')
-    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
     haveI : IteratorFor α m n := .defaultImplementation
     LawfulIteratorFor α m n :=
   letI : IteratorFor α m n := .defaultImplementation
@@ -40,21 +40,9 @@ instance (α : Type w) (m : Type w → Type w') (n : Type w → Type w')
 instance {m : Type w → Type w'} {n : Type w → Type w''}
     {α : Type w} {β : Type v} [Iterator α m β] [Finite α m] [IteratorFor α m n] :
     ForIn n (IterM (α := α) m β) β where
-  forIn it init stepper := by
-    apply IteratorFor.forIn it init (successor_of := fun _ _ _ => True) (fun b c => (⟨·, True.intro⟩) <$> stepper b c)
-    simp only [IterM.ForInWillTerminate]
-    refine Subrelation.wf (r := InvImage IterM.TerminationMeasures.Finite.rel (fun p => p.1.finitelyManySteps)) ?_ ?_
-    · intro p' p h
-      cases h
-      · apply IterM.TerminationMeasures.Finite.rel_of_skip
-        rename_i h
-        exact h.1
-      · rename_i h
-        obtain ⟨out, h, _⟩ := h -- Interesting: Moving `obtain` after `apply` leads to failure
-        apply IterM.TerminationMeasures.Finite.rel_of_yield
-        exact h
-    · apply InvImage.wf
-      exact WellFoundedRelation.wf
+  forIn it init stepper := IteratorFor.forIn it init
+      (successor_of := fun _ _ _ => True)
+      (fun b c => (⟨·, True.intro⟩) <$> stepper b c)
 
 @[specialize]
 def IterM.foldM {m : Type w → Type w'} {n : Type w → Type w'} [Monad n]

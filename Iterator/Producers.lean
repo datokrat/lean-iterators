@@ -81,7 +81,4 @@ instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where
   wf := emptyWf.wf
   subrelation {it it'} h := by cases h
 
-instance [Monad m] [Monad n] [MonadLiftT m n] : IteratorFor (UnfoldIterator α f) m n :=
-  .defaultImplementation
-
 end Unfold

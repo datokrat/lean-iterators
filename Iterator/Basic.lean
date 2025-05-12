@@ -128,10 +128,8 @@ instance [Small.{w} α] [Small.{w} β] : Small.{w} (IterStep α β) where
       | .skip it => .skip it.inflate
       | .done => .done
     deflate_inflate {x} := by
-      dsimp only
       cases x <;> simp
     inflate_deflate {x} := by
-      dsimp only
       cases x <;> simp }⟩
 
 def IterStep.successor : IterStep α β → Option α

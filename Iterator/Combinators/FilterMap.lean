@@ -176,7 +176,8 @@ instance {f : β → HetT m (Option γ)} [Finite α m] :
     IteratorToArray (FilterMapMH α f) m :=
   .defaultImplementation
 
-instance FilterMapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+instance FilterMapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n]
+    [Iterator α m β] [Finite α m] :
     IteratorFor (FilterMapMH α f) m n :=
   .defaultImplementation
 
@@ -191,7 +192,8 @@ instance {f : β → HetT m γ} [IteratorToArray α m] :
       (fun x => do g ((← (f x).computation).inflate (small := _)))
       it.inner.inner
 
-instance MapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] :
+instance MapMH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n]
+    [Iterator α m β] [Finite α m] :
     IteratorFor (MapMH α f) m n :=
   .defaultImplementation
 
