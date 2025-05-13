@@ -44,8 +44,7 @@ _TODO_: prove `Productive`
 Currently, this combinator incurs an additional O(1) cost with each output of `it`, even when the iterator
 does not drop any elements anymore.
 -/
-def IterM.drop [Iterator α m β]
-    (n : Nat) (it : IterM (α := α) m β) :=
+def IterM.drop (n : Nat) (it : IterM (α := α) m β) :=
   toIter (Drop.mk n it) m β
 
 inductive Drop.PlausibleStep [Iterator α m β] (it : IterM (α := Drop α m β) m β) :

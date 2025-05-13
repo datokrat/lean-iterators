@@ -462,7 +462,6 @@ end Dependent
 
 section IterM
 
-set_option pp.universes true in
 @[always_inline, inline]
 def IterM.flatMapD {α : Type w} {β : Type v} {α₂ : β → Type w}
     {γ : Type x} {m : Type w → Type w'}

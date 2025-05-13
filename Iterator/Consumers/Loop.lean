@@ -4,20 +4,20 @@ import Iterator.Basic
 def IterM.DefaultConsumers.forIn {m : Type w → Type w'} {n : Type w → Type w''} [Monad n] [MonadLiftT m n]
     {α : Type w} {β : Type v} {γ : Type w}
     [Iterator α m β] [Finite α m]
-    (it : IterM (α := α) m β) (init : γ) {successor_of : β → γ → γ → Prop}
-    (f : (b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value)) : n γ := do
+    (it : IterM (α := α) m β) (init : γ)
+    (f : (b : β) → (c : γ) → n (ForInStep γ)) : n γ := do
   match (← it.stepH).inflate with
   | .yield it' out _ =>
     match ← f out init with
-    | ⟨.yield c, _⟩ => IterM.DefaultConsumers.forIn it' c f
-    | ⟨.done c, _⟩ => return c
+    | .yield c => IterM.DefaultConsumers.forIn it' c f
+    | .done c => return c
   | .skip it' _ => IterM.DefaultConsumers.forIn it' init f
   | .done _ => return init
 termination_by it.finitelyManySteps
 
 class IteratorFor (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] (n : Type w → Type w'') where
-  forIn : ∀ {γ : Type w}, IterM (α := α) m β → γ → {successor_of : β → γ → γ → Prop} →
-      ((b : β) → (c : γ) → n (Subtype fun s : ForInStep γ => successor_of b c s.value)) →
+  forIn : ∀ {γ : Type w}, IterM (α := α) m β → γ →
+      ((b : β) → (c : γ) → n (ForInStep γ)) →
       n γ
 
 class LawfulIteratorFor (α : Type w) (m : Type w → Type w') (n : Type w → Type w'')
@@ -38,15 +38,13 @@ instance (α : Type w) (m : Type w → Type w') (n : Type w → Type w')
   ⟨fun _ => rfl⟩
 
 instance {m : Type w → Type w'} {n : Type w → Type w''}
-    {α : Type w} {β : Type v} [Iterator α m β] [Finite α m] [IteratorFor α m n] :
+    {α : Type w} {β : Type v} [Iterator α m β] [IteratorFor α m n] :
     ForIn n (IterM (α := α) m β) β where
-  forIn it init stepper := IteratorFor.forIn it init
-      (successor_of := fun _ _ _ => True)
-      (fun b c => (⟨·, True.intro⟩) <$> stepper b c)
+  forIn := IteratorFor.forIn
 
 @[specialize]
 def IterM.foldM {m : Type w → Type w'} {n : Type w → Type w'} [Monad n]
-    {α : Type w} {β : Type v} {γ : Type w} [Iterator α m β] [Finite α m] [IteratorFor α m n]
+    {α : Type w} {β : Type v} {γ : Type w} [Iterator α m β] [IteratorFor α m n]
     (f : γ → β → n γ) (init : γ) (it : IterM (α := α) m β) : n γ :=
   ForIn.forIn it init (fun x acc => ForInStep.yield <$> f acc x)
 

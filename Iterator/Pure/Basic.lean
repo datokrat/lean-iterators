@@ -1,3 +1,4 @@
+prelude
 import Iterator.Basic
 
 structure Iter {α : Type w} (β : Type v) : Type w where
@@ -39,7 +40,7 @@ def Iter.plausible_skip_successor_of {α : Type w} {β : Type v} [Iterator α Id
   it.plausible_step (.skip it')
 
 @[always_inline, inline]
-def Iter.step {α : Type w} {β : Type w} [Iterator α Id β] [Functor Id]
+def Iter.step {α : Type w} {β : Type v} [Iterator α Id β]
     (it : Iter (α := α) β) : it.Step := by
   refine it.toIterM.stepH.run.inflate.map IterM.toPureIter id _ ?_
   intro step hp
