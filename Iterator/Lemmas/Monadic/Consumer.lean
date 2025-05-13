@@ -1,6 +1,6 @@
 import Iterator.Consumers
 import Iterator.Combinators.FilterMap
-import Iterator.Lemmas.Equivalence
+import Iterator.Lemmas.Monadic.Equivalence
 import Iterator.Producers
 
 section Consumers

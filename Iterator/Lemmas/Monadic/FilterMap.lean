@@ -1,5 +1,5 @@
 import Iterator.Combinators.FilterMap
-import Iterator.Lemmas.Consumer
+import Iterator.Lemmas.Monadic.Consumer
 
 theorem Iterator.step_hcongr {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     {it₁  it₂ : IterM (α := α) m β} (h : it₁ = it₂) : Iterator.step (m := m) it₁ = h ▸ Iterator.step (m := m) it₂ := by
