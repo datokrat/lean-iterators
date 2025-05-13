@@ -53,7 +53,7 @@ variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type v'}
 --     (it.filterMapMH f).inner.inner = it.inner := by
 --   simp [IterM.filterMapMH, Iterator.filterMapMH]
 
-theorem filterMapMH_stepH [LawfulMonad m] :
+theorem IterM.filterMapMH_stepH [LawfulMonad m] :
   (it.filterMapMH f).stepH = (do
     match (← it.stepH).inflate with
     | .yield it' out h => do
@@ -74,7 +74,7 @@ theorem filterMapMH_stepH [LawfulMonad m] :
   | .skip it' h => rfl
   | .done h => rfl
 
-theorem filterMapH_stepH [LawfulMonad m] {f : β → Option β'} :
+theorem IterM.filterMapH_stepH [LawfulMonad m] {f : β → Option β'} :
   (it.filterMapH f).stepH = (do
     match (← it.stepH).inflate with
     | .yield it' out h => do
@@ -97,7 +97,7 @@ theorem filterMapH_stepH [LawfulMonad m] {f : β → Option β'} :
   · simp
   · simp
 
-theorem mapMH_stepH [LawfulMonad m] {f : β → HetT m β'} :
+theorem IterM.mapMH_stepH [LawfulMonad m] {f : β → HetT m β'} :
   (it.mapMH f).stepH = (do
     match (← it.stepH).inflate with
     | .yield it' out h => do
@@ -126,7 +126,7 @@ variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type w}
   [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
   (f : β → m (USquash <| Option β'))
 
-theorem filterMapH_step [LawfulMonad m] {f : β → Option β'} :
+theorem IterM.filterMapH_step [LawfulMonad m] {f : β → Option β'} :
   (it.filterMapH f).step = (do
     match (← it.stepH).inflate with
     | .yield it' out h => do
@@ -171,7 +171,7 @@ instance {f : β → HetT m γ} [LawfulMonad m] [IteratorToArray α m]
     induction it using IterM.induct with | step it ih_yield ih_skip =>
     rw [IterM.DefaultConsumers.toArrayMapped_of_stepH]
     rw [IterM.DefaultConsumers.toArrayMapped_of_stepH]
-    simp only [mapMH_stepH, bind_assoc]
+    simp only [IterM.mapMH_stepH, bind_assoc]
     apply bind_congr
     intro step
     generalize step.inflate = step
@@ -224,7 +224,7 @@ section ToList
 variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type w}
   [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
 
-theorem toList_filterMapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
+theorem IterM.toList_filterMapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
     [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → Option β'}
     (it : IterM (α := α) m β) :
     (it.filterMapH f).toList = (fun x => x.filterMap f) <$> it.toList := by
@@ -253,7 +253,7 @@ theorem toList_filterMapH {α : Type w} {m : Type w → Type w'} [Monad m] [Lawf
     assumption
   · simp
 
-theorem toList_mapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
+theorem IterM.toList_mapH {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m] {β : Type w}
     [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → β'}
     (it : IterM (α := α) m β) :
     (it.mapH f).toList = (fun x => x.map f) <$> it.toList := by

@@ -5,9 +5,9 @@ import Iterator.Pure
 -- TODO: consistently require or do not require `Iterator` instances
 -- in combinators
 @[always_inline, inline]
-def Iter.filterMap {α : Type w} {β : Type v} [Iterator α Id β]
+def Iter.filterMap {α : Type w} {β : Type v} {γ : Type v'} [Iterator α Id β]
     (f : β → Option γ) (it : Iter (α := α) β) :=
-  ((it.toIterM.filterMap f).toPureIter : Iter γ)
+  ((it.toIterM.filterMapH f).toPureIter : Iter γ)
 
 @[always_inline, inline]
 def Iter.filter {α : Type w} {β : Type v} [Iterator α Id β]
