@@ -263,4 +263,11 @@ theorem IterM.toList_mapH {α : Type w} {m : Type w → Type w'} [Monad m] [Lawf
   change (fun x => x.filterMap (some ∘ f)) <$> it.toList = _
   rw [List.filterMap_eq_map]
 
+theorem IterM.toList_filter {α : Type w} {m : Type w → Type w'} [Monad m] [LawfulMonad m]
+    {β : Type w} [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m] {f : β → Bool}
+    {it : IterM (α := α) m β} :
+    (it.filter f).toList = List.filter f <$> it.toList := by
+  simp only [filter, toList_filterMapH, ← List.filterMap_eq_filter]
+  rfl
+
 end ToList

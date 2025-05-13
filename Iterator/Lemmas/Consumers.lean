@@ -32,6 +32,12 @@ theorem Iter.toListRev_eq_toListRev_toIterM {α β} [Iterator α Id β] [Finite 
   rfl
 
 @[simp]
+theorem IterM.toList_toPureIter {α β} [Iterator α Id β] [IteratorToArray α Id]
+    {it : IterM (α := α) Id β} :
+    it.toPureIter.toList = it.toList :=
+  rfl
+
+@[simp]
 theorem IterM.toListRev_toPureIter {α β} [Iterator α Id β] [Finite α Id]
     {it : IterM (α := α) Id β} :
     it.toPureIter.toListRev = it.toListRev :=
