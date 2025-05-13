@@ -5,7 +5,6 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Consumers
-import Iterator.Combinators.Monadic.FilterMap
 import Iterator.Lemmas.Monadic.Equivalence
 import Iterator.Producers
 
@@ -141,7 +140,6 @@ theorem IterM.toListRev_of_step [Monad m] [LawfulMonad m] [Iterator α m β] [Fi
   obtain ⟨step, h⟩ := step
   cases step <;> simp [IterM.toListRev.go.aux₂]
 
--- TODO: rename `toListRev` -> `toListRev`
 theorem IterM.reverse_toListRev [Monad m] [LawfulMonad m] [Iterator α m β]
     [IteratorToArray α m] [LawfulIteratorToArray α m]
     {it : IterM (α := α) m β} :
@@ -153,6 +151,13 @@ theorem IterM.reverse_toListRev [Monad m] [LawfulMonad m] [Iterator α m β]
   refine congrArg (_ >>= ·) ?_
   ext step
   split <;> simp (discharger := assumption) [ihy, ihs]
+
+theorem IterM.toListRev_eq [Monad m] [LawfulMonad m] [Iterator α m β]
+    [IteratorToArray α m] [LawfulIteratorToArray α m]
+    {it : IterM (α := α) m β} :
+    it.toListRev = List.reverse <$> it.toList := by
+  rw [← IterM.reverse_toListRev]
+  simp
 
 end Consumers
 

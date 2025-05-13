@@ -5,7 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Combinators.Monadic.FilterMap
-import Iterator.Lemmas.Monadic.Consumer
+import Iterator.Lemmas.Monadic.Consumers
 
 theorem Iterator.step_hcongr {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
     {it₁  it₂ : IterM (α := α) m β} (h : it₁ = it₂) : Iterator.step (m := m) it₁ = h ▸ Iterator.step (m := m) it₂ := by

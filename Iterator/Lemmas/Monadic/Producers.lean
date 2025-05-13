@@ -6,7 +6,7 @@ Authors: Paul Reichert
 prelude
 import Iterator.Producers
 import Iterator.Consumers
-import Iterator.Lemmas.Monadic.Consumer
+import Iterator.Lemmas.Monadic.Consumers
 
 section ListIterator
 
@@ -46,5 +46,9 @@ theorem List.toArray_iterM {l : List β} :
 theorem List.toList_iterM {l : List β} :
     (l.iterM m).toList = pure l := by
   rw [← IterM.toList_toArray, List.toArray_iterM, map_pure, toList_toArray]
+
+theorem List.toListRev_iterM {l : List β} :
+    (l.iterM m).toListRev = pure l.reverse := by
+  simp [IterM.toListRev_eq, List.toList_iterM]
 
 end ListIterator

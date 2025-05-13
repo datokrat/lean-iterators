@@ -5,7 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Combinators.Monadic.FlatMap
-import Iterator.Lemmas.Monadic.Consumer
+import Iterator.Lemmas.Monadic.Consumers
 
 theorem IterM.flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
     {γ : Type v'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
