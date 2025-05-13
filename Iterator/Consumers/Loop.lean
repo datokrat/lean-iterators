@@ -6,13 +6,20 @@ Authors: Paul Reichert
 prelude
 import Iterator.Pure
 import Iterator.Consumers.Monadic.Loop
+import Iterator.Consumers.Partial
 
 instance (α : Type w) (β : Type v) (n : Type w → Type w') [Monad n]
-    [Iterator α Id β] [Finite α Id] :
-    [IteratorFor α Id n] →
+    [Iterator α Id β] [Finite α Id] [IteratorFor α Id n] :
     ForIn n (Iter (α := α) β) β where
   forIn it init f :=
     IteratorFor.finiteForIn (fun δ (c : Id δ) => pure c.run) |>.forIn it.toIterM init f
+
+instance (α : Type w) (β : Type v) (n : Type w → Type w') [Monad n]
+    [Iterator α Id β] [IteratorForPartial α Id n] :
+    ForIn n (Iter.Partial (α := α) β) β where
+  forIn it init f :=
+    letI : MonadLift Id n := ⟨pure⟩
+    ForIn.forIn it.it.toIterM.allowNontermination init f
 
 @[always_inline, inline]
 def Iter.foldM {n : Type w → Type w} [Monad n]
@@ -22,6 +29,18 @@ def Iter.foldM {n : Type w → Type w} [Monad n]
   ForIn.forIn it init (fun x acc => ForInStep.yield <$> f acc x)
 
 @[always_inline, inline]
+def Iter.Partial.foldM {n : Type w → Type w} [Monad n]
+    {α : Type w} {β : Type v} {γ : Type w} [Iterator α Id β]
+    [IteratorForPartial α Id n] (f : γ → β → n γ)
+    (init : γ) (it : Iter.Partial (α := α) β) : n γ :=
+  ForIn.forIn it init (fun x acc => ForInStep.yield <$> f acc x)
+
+@[always_inline, inline]
 def Iter.count {α : Type u} {β : Type v} [Iterator α Id β] [Finite α Id]
     (it : Iter (α := α) β) : Nat :=
   it.toIterM.count
+
+@[always_inline, inline]
+def Iter.Partial.count {α : Type u} {β : Type v} [Iterator α Id β]
+    (it : Iter.Partial (α := α) β) : Nat :=
+  it.it.toIterM.allowNontermination.count
