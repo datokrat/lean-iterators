@@ -1,5 +1,11 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
+prelude
 import Iterator.Consumers
-import Iterator.Combinators.FilterMap
+import Iterator.Combinators.Monadic.FilterMap
 import Iterator.Lemmas.Monadic.Equivalence
 import Iterator.Producers
 

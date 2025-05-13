@@ -1,7 +1,12 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
 prelude
 import Iterator.Lemmas.Monadic.FlatMap
-import Iterator.Pure.Combinators.FlatMap
-import Iterator.Pure.Consumers.Collect
+import Iterator.Combinators.FlatMap
+import Iterator.Consumers.Collect
 
 theorem Iter.toList_flatMap {α α₂ : Type w} {β : Type w}
     {γ : Type w} [Iterator α Id β] [Iterator α₂ Id γ] [Finite α Id] [Finite α₂ Id]

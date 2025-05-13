@@ -7,7 +7,7 @@ prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
 import Iterator.Consumers.Loop
-import Iterator.Pure.Basic
+import Iterator.Pure
 import Init.Data.Nat.Lemmas
 
 section ListIterator

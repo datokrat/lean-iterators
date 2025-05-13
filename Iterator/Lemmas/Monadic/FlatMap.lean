@@ -1,5 +1,10 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
 prelude
-import Iterator.Combinators.FlatMap
+import Iterator.Combinators.Monadic.FlatMap
 import Iterator.Lemmas.Monadic.Consumer
 
 theorem IterM.flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : Type v}
@@ -9,7 +14,7 @@ theorem IterM.flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {�
     | none => do
         match (← it₁.stepH).inflate with
         | .yield it' innerIt h =>
-          pure <| .deflate <| .skip (it'.flatMapAfter f (f innerIt)) (.outerYield h)
+          pure <| .deflate <| .skip (it'.flatMapAfter f (some <| f innerIt)) (.outerYield h)
         | .skip it' h =>
           pure <| .deflate <| .skip (it'.flatMapAfter f none) (.outerSkip h)
         | .done h =>
@@ -17,9 +22,9 @@ theorem IterM.flatMapAfter_stepH {α α₂ : Type w} {m : Type w → Type w'} {�
     | some it₂ => do
         match (← it₂.stepH).inflate with
         | .yield it' out h =>
-          pure <| .deflate <| .yield (it₁.flatMapAfter f it') out (.innerYield h)
+          pure <| .deflate <| .yield (it₁.flatMapAfter f (some it')) out (.innerYield h)
         | .skip it' h =>
-          pure <| .deflate <| .skip (it₁.flatMapAfter f it') (.innerSkip h)
+          pure <| .deflate <| .skip (it₁.flatMapAfter f (some it')) (.innerSkip h)
         | .done h =>
           pure <| .deflate <| .skip (it₁.flatMapAfter f none) (.innerDone h)) := by
   split
@@ -37,7 +42,7 @@ theorem IterM.flatMapAfter_step {α α₂ : Type w} {m : Type w → Type w'} {β
     | none => do
         match (← it₁.stepH).inflate with
         | .yield it' innerIt h =>
-          pure <| .skip (it'.flatMapAfter f (f innerIt)) (.outerYield h)
+          pure <| .skip (it'.flatMapAfter f (some <| f innerIt)) (.outerYield h)
         | .skip it' h =>
           pure <| .skip (it'.flatMapAfter f none) (.outerSkip h)
         | .done h =>
@@ -45,9 +50,9 @@ theorem IterM.flatMapAfter_step {α α₂ : Type w} {m : Type w → Type w'} {β
     | some it₂ => do
         match ← it₂.step with
         | .yield it' out h =>
-          pure <| .yield (it₁.flatMapAfter f it') out (.innerYield h)
+          pure <| .yield (it₁.flatMapAfter f (some it')) out (.innerYield h)
         | .skip it' h =>
-          pure <| .skip (it₁.flatMapAfter f it') (.innerSkip h)
+          pure <| .skip (it₁.flatMapAfter f (some it')) (.innerSkip h)
         | .done h =>
           pure <| .skip (it₁.flatMapAfter f none) (.innerDone h)) := by
   split
@@ -65,7 +70,7 @@ theorem IterM.flatMap_stepH {α α₂ : Type w} {m : Type w → Type w'} {β : T
     (it.flatMap f).stepH = (do
       match (← it.stepH).inflate with
       | .yield it' innerIt h =>
-        pure <| .deflate <| .skip (it'.flatMapAfter f (f innerIt)) (.outerYield h)
+        pure <| .deflate <| .skip (it'.flatMapAfter f (some <| f innerIt)) (.outerYield h)
       | .skip it' h =>
         pure <| .deflate <| .skip (it'.flatMap f) (.outerSkip h)
       | .done h =>
@@ -82,7 +87,7 @@ theorem IterM.flatMap_step {α α₂ : Type w} {m : Type w → Type w'} {β : Ty
     (it.flatMap f).step = (do
       match (← it.stepH).inflate with
       | .yield it' innerIt h =>
-        pure <| .skip (it'.flatMapAfter f (f innerIt)) (.outerYield h)
+        pure <| .skip (it'.flatMapAfter f (some <| f innerIt)) (.outerYield h)
       | .skip it' h =>
         pure <| .skip (it'.flatMap f) (.outerSkip h)
       | .done h =>

@@ -1,4 +1,10 @@
-import Iterator.Combinators.FilterMap
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul Reichert
+-/
+prelude
+import Iterator.Combinators.Monadic.FilterMap
 import Iterator.Lemmas.Monadic.Consumer
 
 theorem Iterator.step_hcongr {α : Type w} {m : Type w → Type w'} {β : Type v} [Iterator α m β]
