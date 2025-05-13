@@ -66,6 +66,18 @@ instance {m : Type w → Type w'} [Monad m] : Monad (HetT.{w, w', u} m) where
   pure x := ⟨fun y => x = y, sorry, pure <| .deflate (small := _) ⟨x, rfl⟩⟩
   bind x f := x.bindH f
 
+@[simp]
+theorem HetT.computation_pure {m : Type w → Type w'} [Monad m] {α : Type u}
+    {x : α} :
+    (pure x : HetT m α).computation = pure (.deflate ⟨x, rfl⟩ (small := _)) :=
+  rfl
+
+@[simp]
+theorem HetT.property_pure {m : Type w → Type w'} [Monad m] {α : Type u}
+    {x : α} :
+    (pure x : HetT m α).property = (x = ·) :=
+  rfl
+
 theorem HEq.congrArg {α : Sort u} {β : α → Type v} (f : (a : α) → β a) {a a'} (h : a = a') :
     HEq (f a) (f a') := by
   cases h; rfl

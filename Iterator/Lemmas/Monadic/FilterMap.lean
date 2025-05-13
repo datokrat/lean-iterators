@@ -48,11 +48,6 @@ variable {α : Type w} {m : Type w → Type w'} {β : Type v} {β' : Type v'}
   [Iterator α m β] (it : IterM (α := α) m β) [Monad m]
   (f : β → HetT m (Option β'))
 
--- @[simp]
--- theorem plausible_step_filterMapMH :
---     (it.filterMapMH f).inner.inner = it.inner := by
---   simp [IterM.filterMapMH, Iterator.filterMapMH]
-
 theorem IterM.filterMapMH_stepH [LawfulMonad m] :
   (it.filterMapMH f).stepH = (do
     match (← it.stepH).inflate with
@@ -115,6 +110,50 @@ theorem IterM.mapMH_stepH [LawfulMonad m] {f : β → HetT m β'} :
   split
   · simp only [HetT.computation_mapH, bind_map_left, USquash.inflate_deflate, bind_pure_comp]
     rfl
+  · rfl
+  · rfl
+
+theorem IterM.stepH_mapH [LawfulMonad m] {f : β → β'} :
+  (it.mapH f).stepH = (do
+    match (← it.stepH).inflate with
+    | .yield it' out h =>
+      let out' := f out
+      pure <| .deflate <| .yield (it'.mapH f) out' (.yieldSome h ⟨⟨out', rfl⟩, rfl⟩)
+    | .skip it' h =>
+      pure <| .deflate <| .skip (it'.mapH f) (.skip h)
+    | .done h => pure <| .deflate <| .done (.done h)) := by
+  simp only [mapH, IterM.mapMH_stepH]
+  apply bind_congr
+  intro step
+  generalize step.inflate = step
+  split
+  · simp
+  · rfl
+  · rfl
+
+theorem IterM.stepH_filter [LawfulMonad m] {f : β → Bool} :
+  (it.filter f).stepH = (do
+    match (← it.stepH).inflate with
+    | .yield it' out h =>
+      if h' : f out = true then
+        pure <| .deflate <| .yield (it'.filter f) out (.yieldSome h (by simp [h']))
+      else
+        pure <| .deflate <| .skip (it'.filter f) (.yieldNone h (by simp [h']))
+    | .skip it' h =>
+      pure <| .deflate <| .skip (it'.filter f) (.skip h)
+    | .done h => pure <| .deflate <| .done (.done h)) := by
+  simp only [filter, IterM.filterMapH_stepH]
+  apply bind_congr
+  intro step
+  generalize step.inflate = step
+  split
+  · split
+    · split
+      · exfalso; simp_all
+      · rfl
+    · split
+      · congr; simp_all
+      · exfalso; simp_all
   · rfl
   · rfl
 
