@@ -153,11 +153,12 @@ info: [time("13:47:35.833520000"),
 -/
 -- #eval timestamps 5
 
--- Note: The following wouldn't work because the `Productive` instance for `.mapM` is still missing
-/-
-def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
-  IterM.unfold 0 (fun _ => 0) IO |>.take n |>.mapM (fun _ => Std.Time.PlainTime.now) |>.toList
--/
+-- Note:
+-- The following terminates but we can't prove it because the `Productive` instance for `.mapM` is still missing.
+-- Hence we need to use the `partial` variant of `toList` -- it might not terminate and we
+-- can't prove anything about this function.
+def timestamps' (n : Nat) : IO (List Std.Time.PlainTime) := do
+  IterM.unfold IO 0 (fun _ => 0) |>.mapM (fun _ => Std.Time.PlainTime.now) |>.take n |>.allowNontermination.toList
 
 -- This example demonstrates that chained `mapM` calls are executed in a different order than with `List.mapM`.
 def chainedMapM (l : List Nat) : IO Unit :=
