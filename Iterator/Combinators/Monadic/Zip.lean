@@ -304,8 +304,15 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
 instance ZipH.instIteratorToArray [Monad m] [Finite (ZipH α₁ m α₂ β₂) m] : IteratorToArray (ZipH α₁ m α₂ β₂) m :=
   .defaultImplementation
 
-instance ZipH.instIteratorFor [Monad m] [Monad n] [Finite (ZipH α₁ m α₂ β₂) m] :
+instance ZipH.instIteratorToArrayPartial [Monad m] : IteratorToArrayPartial (ZipH α₁ m α₂ β₂) m :=
+  .defaultImplementation
+
+instance ZipH.instIteratorFor [Monad m] [Monad n] :
     IteratorFor (ZipH α₁ m α₂ β₂) m n :=
+  .defaultImplementation
+
+instance ZipH.instIteratorForPartial [Monad m] [Monad n] :
+    IteratorForPartial (ZipH α₁ m α₂ β₂) m n :=
   .defaultImplementation
 
 end ZipH

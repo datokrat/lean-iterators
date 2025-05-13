@@ -168,9 +168,17 @@ instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α
 instance Take.instIteratorToArray [Monad m] [Iterator α m β] [Productive α m] : IteratorToArray (Take α m β) m :=
   .defaultImplementation
 
-instance Take.instIteratorFor [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
+instance Take.instIteratorToArrayPartial [Monad m] [Iterator α m β] : IteratorToArrayPartial (Take α m β) m :=
+  .defaultImplementation
+
+instance Take.instIteratorFor [Monad m] [Monad n] [Iterator α m β] :
     IteratorFor (Take α m β) m n :=
   .defaultImplementation
+
+instance Take.instIteratorForPartial [Monad m] [Monad n] [Iterator α m β] :
+    IteratorForPartial (Take α m β) m n :=
+  .defaultImplementation
+
   -- TODO: use [IteratorFor α m n]
     -- forIn {γ} it init successor_of stepper _ := by
     -- refine Prod.fst <$> (IteratorFor.forIn (α := α) (m := m) (n := n) (innerIter it) (γ := γ × Nat) (init, it.inner.remaining)

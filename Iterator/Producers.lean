@@ -52,7 +52,13 @@ instance [Pure m] : FinitenessRelation (ListIterator α) m where
 instance {α : Type w} [Monad m] : IteratorToArray (ListIterator α) m :=
   .defaultImplementation
 
+instance {α : Type w} [Monad m] : IteratorToArrayPartial (ListIterator α) m :=
+  .defaultImplementation
+
 instance {α : Type w} [Monad m] [Monad n] : IteratorFor (ListIterator α) m n :=
+  .defaultImplementation
+
+instance {α : Type w} [Monad m] [Monad n] : IteratorForPartial (ListIterator α) m n :=
   .defaultImplementation
 
 end ListIterator
@@ -91,8 +97,12 @@ instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where
   wf := emptyWf.wf
   subrelation {it it'} h := by cases h
 
-
 instance {α : Type w} {f : α → α} [Monad m] [Monad n] : IteratorFor (UnfoldIterator α f) m n :=
   .defaultImplementation
+
+instance {α : Type w} {f : α → α} [Monad m] [Monad n] : IteratorForPartial (UnfoldIterator α f) m n :=
+  .defaultImplementation
+
+-- We do *not* implement `IteratorToArrayPartial` because there is no change at all that it will terminate.
 
 end Unfold

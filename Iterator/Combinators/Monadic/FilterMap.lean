@@ -176,9 +176,18 @@ instance {f : β → HetT m (Option γ)} [Finite α m] :
     IteratorToArray (FilterMapMH α f) m :=
   .defaultImplementation
 
+instance {f : β → HetT m (Option γ)} :
+    IteratorToArrayPartial (FilterMapMH α f) m :=
+  .defaultImplementation
+
 instance FilterMapMH.instIteratorFor [Monad m] [Monad n]
-    [Iterator α m β] [Finite α m] :
+    [Iterator α m β] :
     IteratorFor (FilterMapMH α f) m n :=
+  .defaultImplementation
+
+instance FilterMapMH.instIteratorForPartial [Monad m] [Monad n]
+    [Iterator α m β] :
+    IteratorForPartial (FilterMapMH α f) m n :=
   .defaultImplementation
 
 /--
@@ -192,9 +201,21 @@ instance {f : β → HetT m γ} [IteratorToArray α m] :
       (fun x => do g ((← (f x).computation).inflate (small := _)))
       it.inner.inner
 
-instance MapMH.instIteratorFor [Monad m] [Monad n]
-    [Iterator α m β] [Finite α m] :
+instance {f : β → HetT m γ} [IteratorToArrayPartial α m] :
+    IteratorToArrayPartial (MapMH α f) m where
+  toArrayMappedPartial g it :=
+    IteratorToArrayPartial.toArrayMappedPartial
+      (fun x => do g ((← (f x).computation).inflate (small := _)))
+      it.inner.inner
+
+instance MapMH.instIteratorFor {f : β → HetT m γ}
+    [Monad m] [Monad n] [Iterator α m β] :
     IteratorFor (MapMH α f) m n :=
+  .defaultImplementation
+
+instance MapMH.instIteratorForPartial {f : β → HetT m γ}
+    [Monad m] [Monad n] [Iterator α m β] :
+    IteratorForPartial (MapMH α f) m n :=
   .defaultImplementation
 
 /--

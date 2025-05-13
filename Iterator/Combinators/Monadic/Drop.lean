@@ -140,9 +140,18 @@ instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] 
       apply IterM.TerminationMeasures.Finite.rel_of_yield
       exact h'
 
-instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray (Drop α m β) m :=
+instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] :
+    IteratorToArray (Drop α m β) m :=
   .defaultImplementation
 
-instance Drop.instIteratorFor [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
+instance Drop.instIteratorToArrayPartial [Monad m] [Iterator α m β] :
+    IteratorToArrayPartial (Drop α m β) m :=
+  .defaultImplementation
+
+instance Drop.instIteratorFor [Monad m] [Monad n] [Iterator α m β] :
     IteratorFor (Drop α m β) m n :=
+  .defaultImplementation
+
+instance Drop.instIteratorForPartial [Monad m] [Monad n] [Iterator α m β] :
+    IteratorForPartial (Drop α m β) m n :=
   .defaultImplementation

@@ -340,9 +340,16 @@ instance FlatMap.instIteratorToArray [Monad m] [Iterator α₂ m γ] [Finite α 
     IteratorToArray (FlatMap α f) m :=
   .defaultImplementation
 
-instance FlatMap.instIteratorFor [Monad m] [Monad n] [Iterator α₂ m γ]
-    [Finite α m] [Finite α₂ m] :
+instance FlatMap.instIteratorToArrayPartial [Monad m] [Iterator α₂ m γ] :
+    IteratorToArrayPartial (FlatMap α f) m :=
+  .defaultImplementation
+
+instance FlatMap.instIteratorFor [Monad m] [Monad n] [Iterator α₂ m γ] :
     IteratorFor (FlatMap α f) m n :=
+  .defaultImplementation
+
+instance FlatMap.instIteratorForPartial [Monad m] [Monad n] [Iterator α₂ m γ] :
+    IteratorForPartial (FlatMap α f) m n :=
   .defaultImplementation
 
 end Finite
@@ -453,9 +460,17 @@ instance SigmaIterator.instIteratorToArray [Monad m] [∀ b, Iterator (α b) m �
     IteratorToArray (SigmaIterator α m γ) m :=
   .defaultImplementation
 
+instance SigmaIterator.instIteratorToArrayPartial [Monad m] [∀ b, Iterator (α b) m γ] :
+    IteratorToArrayPartial (SigmaIterator α m γ) m :=
+  .defaultImplementation
+
 instance SigmaIterator.instIteratorFor [Monad m] [Monad n]
-    [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
-    IteratorFor (SigmaIterator α m γ) m n :=
+    [∀ b, Iterator (α b) m γ] : IteratorFor (SigmaIterator α m γ) m n :=
+  .defaultImplementation
+
+instance SigmaIterator.instIteratorForPartial [Monad m] [Monad n]
+    [∀ b, Iterator (α b) m γ] :
+    IteratorForPartial (SigmaIterator α m γ) m n :=
   .defaultImplementation
 
 end Dependent

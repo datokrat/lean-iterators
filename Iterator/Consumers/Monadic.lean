@@ -6,4 +6,4 @@ Authors: Paul Reichert
 prelude
 import Iterator.Consumers.Monadic.Collect
 import Iterator.Consumers.Monadic.Loop
-import Iterator.Consumers.Monadic.Size
+import Iterator.Consumers.Monadic.Partial
