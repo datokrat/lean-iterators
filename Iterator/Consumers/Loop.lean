@@ -7,15 +7,16 @@ prelude
 import Iterator.Pure
 import Iterator.Consumers.Monadic.Loop
 
-instance (α : Type w) (β : Type v) (n : Type w → Type w')
-    [Iterator α Id β] :
+instance (α : Type w) (β : Type v) (n : Type w → Type w') [Monad n]
+    [Iterator α Id β] [Finite α Id] :
     [IteratorFor α Id n] →
     ForIn n (Iter (α := α) β) β where
-  forIn it := IteratorFor.forIn (_lift := fun _ c => pure c.run) it.toIterM
+  forIn it init f :=
+    IteratorFor.finiteForIn (fun δ (c : Id δ) => pure c.run) |>.forIn it.toIterM init f
 
 @[always_inline, inline]
 def Iter.foldM {n : Type w → Type w} [Monad n]
-    {α : Type w} {β : Type v} {γ : Type w} [Iterator α Id β]
+    {α : Type w} {β : Type v} {γ : Type w} [Iterator α Id β] [Finite α Id]
     [IteratorFor α Id n] (f : γ → β → n γ)
     (init : γ) (it : Iter (α := α) β) : n γ :=
   ForIn.forIn it init (fun x acc => ForInStep.yield <$> f acc x)
