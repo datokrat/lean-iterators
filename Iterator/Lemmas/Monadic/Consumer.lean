@@ -107,10 +107,10 @@ theorem IterM.toList_of_step [Monad m] [LawfulMonad m] [Iterator α m β]
   ext step
   split <;> simp
 
-theorem IterM.reverseToList.go.aux₁ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
+theorem IterM.toListRev.go.aux₁ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : IterM (α := α) m β} {b : β} {bs : List β} :
-    IterM.reverseToList.go it (bs ++ [b]) = (· ++ [b]) <$> IterM.reverseToList.go it bs:= by
-  induction it, bs using IterM.reverseToList.go.induct
+    IterM.toListRev.go it (bs ++ [b]) = (· ++ [b]) <$> IterM.toListRev.go it bs:= by
+  induction it, bs using IterM.toListRev.go.induct
   next it bs ih₁ ih₂ =>
   rw [go, go, map_eq_pure_bind, bind_assoc]
   refine congrArg (IterM.step it >>= ·) ?_
@@ -118,38 +118,38 @@ theorem IterM.reverseToList.go.aux₁ [Monad m] [LawfulMonad m] [Iterator α m �
   simp only [List.cons_append] at ih₁
   split <;> simp [*]
 
-theorem IterM.reverseToList.go.aux₂ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
+theorem IterM.toListRev.go.aux₂ [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : IterM (α := α) m β} {acc : List β} :
-    IterM.reverseToList.go it acc = (· ++ acc) <$> it.reverseToList := by
+    IterM.toListRev.go it acc = (· ++ acc) <$> it.toListRev := by
   rw [← List.reverse_reverse (as := acc)]
   generalize acc.reverse = acc
   induction acc with
-  | nil => simp [reverseToList]
-  | cons x xs ih => simp [IterM.reverseToList.go.aux₁, ih]
+  | nil => simp [toListRev]
+  | cons x xs ih => simp [IterM.toListRev.go.aux₁, ih]
 
-theorem IterM.reverseToList_of_step [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
+theorem IterM.toListRev_of_step [Monad m] [LawfulMonad m] [Iterator α m β] [Finite α m]
     {it : IterM (α := α) m β} :
-    it.reverseToList = (do
+    it.toListRev = (do
       match ← it.step with
-      | .yield it' out _ => return (← it'.reverseToList) ++ [out]
-      | .skip it' _ => it'.reverseToList
+      | .yield it' out _ => return (← it'.toListRev) ++ [out]
+      | .skip it' _ => it'.toListRev
       | .done _ => return []) := by
-  simp [IterM.reverseToList]
-  rw [reverseToList.go]
+  simp [IterM.toListRev]
+  rw [toListRev.go]
   refine congrArg (it.step >>= ·) ?_
   ext step
   obtain ⟨step, h⟩ := step
-  cases step <;> simp [IterM.reverseToList.go.aux₂]
+  cases step <;> simp [IterM.toListRev.go.aux₂]
 
--- TODO: rename `reverseToList` -> `toListRev`
-theorem IterM.reverse_reverseToList [Monad m] [LawfulMonad m] [Iterator α m β]
+-- TODO: rename `toListRev` -> `toListRev`
+theorem IterM.reverse_toListRev [Monad m] [LawfulMonad m] [Iterator α m β]
     [IteratorToArray α m] [LawfulIteratorToArray α m]
     {it : IterM (α := α) m β} :
-    List.reverse <$> it.reverseToList = it.toList := by
+    List.reverse <$> it.toListRev = it.toList := by
   apply Eq.symm
   induction it using IterM.induct
   rename_i it ihy ihs
-  rw [reverseToList_of_step, toList_of_step, map_eq_pure_bind, bind_assoc]
+  rw [toListRev_of_step, toList_of_step, map_eq_pure_bind, bind_assoc]
   refine congrArg (_ >>= ·) ?_
   ext step
   split <;> simp (discharger := assumption) [ihy, ihs]

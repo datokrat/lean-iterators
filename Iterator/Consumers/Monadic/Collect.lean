@@ -52,7 +52,7 @@ def IterM.toArray {α : Type w} {m : Type w → Type w'} {β : Type w} [Monad m]
 end ToArray
 
 @[inline]
-def IterM.reverseToList {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
+def IterM.toListRev {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
     [Iterator α m β] [Finite α m] (it : IterM (α := α) m β) : m (List β) :=
   go it []
 where

@@ -13,9 +13,9 @@ def Iter.toArray {α : Type w} {β : Type w}
   it.toIterM.toArray
 
 @[always_inline, inline]
-def Iter.reverseToList {α : Type w} {β : Type w}
+def Iter.toListRev {α : Type w} {β : Type w}
     [Iterator α Id β] [Finite α Id] (it : Iter (α := α) β) : List β :=
-  it.toIterM.reverseToList
+  it.toIterM.toListRev
 
 @[always_inline, inline]
 def Iter.toList {α : Type w} {β : Type w}
