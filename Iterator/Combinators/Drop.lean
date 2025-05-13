@@ -143,6 +143,6 @@ instance Drop.instFinitenessRelation [Iterator α m β] [Monad m] [Finite α m] 
 instance Drop.instIteratorToArray [Monad m] [Iterator α m β] [Finite α m] : IteratorToArray (Drop α m β) m :=
   .defaultImplementation
 
-instance Drop.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
+instance Drop.instIteratorFor [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
     IteratorFor (Drop α m β) m n :=
   .defaultImplementation

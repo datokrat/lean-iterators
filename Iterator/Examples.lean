@@ -22,19 +22,18 @@ end Primes
 
 def hideEggs : IO Unit := do
   -- Repeat colors and locations indefinitely
-  let colors := IterM.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+  let colors := Iter.unfold (0 : Nat) (· + 1) |>.map fun n =>
     #["green", "red", "yellow"][n % 3]!
-  let locations := IterM.unfold Id (0 : Nat) (· + 1) |>.map fun n =>
+  let locations := Iter.unfold (0 : Nat) (· + 1) |>.map fun n =>
     #["in a boot", "underneath a lampshade", "under the cushion", "in the lawn"][n % 4]!
   -- Summon the chickens
-  let chickens := ["Clucky", "Patches", "Fluffy"].iter Id
+  let chickens := ["Clucky", "Patches", "Fluffy"].iter
   -- Gather, color and hide the eggs
-  let eggs := chickens.flatMap (fun x : String => IterM.unfold Id x id |>.take 3)
+  let eggs := chickens.flatMap (fun x : String => Iter.unfold x id |>.take 3)
     |>.zip colors
     |>.zip locations
   -- Report the results (top secret)
-  let eggsIO := eggs.switchMonad (pure : ∀ {γ}, γ → IO γ) -- Obtain an IO-monadic iterator
-  for x in eggsIO do
+  for x in eggs do
     IO.println s! "{x.1.1} hides a {x.1.2} egg {x.2}."
   -- Alternative : eggsIO.mapM (fun x => IO.println s!"{x.1.1} hides a {x.1.2} egg {x.2}.") |>.drain
 
@@ -60,7 +59,7 @@ def firstOfEach (l : List (List Nat)) : List Nat :=
 #eval! firstOfEach [[1, 2], [], [3, 4]]
 
 def deepSum (l : List (List Nat)) : Nat :=
-  go (l.iter Id |>.flatMap fun l' => l'.iter Id) 0
+  go (l.iter |>.flatMap fun l' => l'.iter) 0
 where
   @[specialize]
   go it acc :=
@@ -107,15 +106,15 @@ Additional diagnostic information may be available using the `set_option diagnos
 -- as Rust
 
 def dependentFlatMap (l : List (List Nat)) : List Nat :=
-  let it := IterM.unfold Id 2 (· + 1) |>.zip l.iter
-  it.flatMapD (fun (x : Nat × List Nat) => (x.2.iter Id).filter fun y => y % x.1 = 0) |>.toList
+  let it := Iter.unfold 2 (· + 1) |>.zip l.iter
+  it.flatMapD (fun (x : Nat × List Nat) => x.2.iter.filter fun y => y % x.1 = 0) |>.toList
 
 /-- info: [2, 6, 9] -/
 #guard_msgs in
 #eval! dependentFlatMap [[1, 2, 3], [4, 5, 6, 9]]
 
 def addIndices (l : List Nat) : List (Nat × Nat) :=
-  IterM.unfold Id 0 (· + 1) |>.zip (l.iter Id) |>.toList
+  Iter.unfold 0 (· + 1) |>.zip l.iter |>.toList
 
 /-- info: [(0, 3), (1, 1), (2, 4), (3, 1), (4, 5), (5, 9)] -/
 #guard_msgs in
@@ -126,7 +125,7 @@ def addIndices (l : List Nat) : List (Nat × Nat) :=
 #eval! [3, 1, 4, 1, 5, 9].iter.filter (· % 2 = 0) |>.toList
 
 def printNums (l : List Nat) : IO Unit :=
-  l.iter IO |>.mapM (fun n => do IO.println (toString n); pure n) |>.drain
+  l.iterM IO |>.mapM (fun n => do IO.println (toString n); pure n) |>.drain
 
 
 /--
@@ -139,7 +138,7 @@ info: 1
 
 -- Same result as `printNums` but showcasing that we can use iterators in `for-in` constructs
 def printNumsForIn (l : List Nat) : IO Unit := do
-  for n in l.iter IO do
+  for n in l.iter do
     IO.println n
 
 def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
@@ -162,7 +161,7 @@ def timestamps (n : Nat) : IO (List Std.Time.PlainTime) := do
 
 -- This example demonstrates that chained `mapM` calls are executed in a different order than with `List.mapM`.
 def chainedMapM (l : List Nat) : IO Unit :=
-  l.iter IO |>.mapM (IO.println <| s!"1st {.}") |>.mapM (IO.println <| s!"2nd {·}") |>.drain
+  l.iterM IO |>.mapM (IO.println <| s!"1st {.}") |>.mapM (IO.println <| s!"2nd {·}") |>.drain
 
 /--
 info: 1st 1

@@ -7,6 +7,7 @@ prelude
 import Iterator.Basic
 import Iterator.Consumers.Collect
 import Iterator.Consumers.Loop
+import Iterator.Pure.Basic
 import Init.Data.Nat.Lemmas
 
 section ListIterator
@@ -21,9 +22,14 @@ Returns a finite iterator for the given list.
 The iterator yields the elements of the list in order and then terminates.
 -/
 @[always_inline, inline]
-def List.iter {α : Type w} (l : List α) (m : Type w → Type w' := by exact Id) [Pure m] :
+def List.iterM {α : Type w} (l : List α) (m : Type w → Type w') [Pure m] :
     IterM (α := ListIterator α) m α :=
   toIter { list := l } m α
+
+@[always_inline, inline]
+def List.iter {α : Type w} (l : List α) :
+    Iter (α := ListIterator α) α :=
+  ((l.iterM Id).toPureIter : Iter α)
 
 instance {α : Type w} [Pure m] : Iterator (ListIterator α) m α where
   plausible_step it
@@ -46,7 +52,7 @@ instance [Pure m] : FinitenessRelation (ListIterator α) m where
 instance {α : Type w} [Monad m] : IteratorToArray (ListIterator α) m :=
   .defaultImplementation
 
-instance {α : Type w} [Monad m] [Monad n] [MonadLiftT m n] : IteratorFor (ListIterator α) m n :=
+instance {α : Type w} [Monad m] [Monad n] : IteratorFor (ListIterator α) m n :=
   .defaultImplementation
 
 end ListIterator
@@ -72,9 +78,13 @@ instance [Pure m] : Iterator (UnfoldIterator α f) m α where
 Creates an infinite, productive iterator. First it yields `init`.
 If the last step yielded `a`, the next will yield `f a`.
 -/
-@[inline]
+@[always_inline, inline]
 def IterM.unfold (m : Type w → Type w') [Pure m] {α : Type w} (init : α) (f : α → α) :=
   toIter (UnfoldIterator.mk (f := f) init) m α
+
+@[always_inline, inline]
+def Iter.unfold {α : Type w} (init : α) (f : α → α) :=
+  ((IterM.unfold Id init f).toPureIter : Iter α)
 
 instance [Pure m] : ProductivenessRelation (UnfoldIterator α f) m where
   rel := emptyWf.rel

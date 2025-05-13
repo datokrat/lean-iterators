@@ -304,7 +304,7 @@ instance [Monad m] [Productive α₁ m] [Finite α₂ m] :
 instance ZipH.instIteratorToArray [Monad m] [Finite (ZipH α₁ m α₂ β₂) m] : IteratorToArray (ZipH α₁ m α₂ β₂) m :=
   .defaultImplementation
 
-instance ZipH.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Finite (ZipH α₁ m α₂ β₂) m] :
+instance ZipH.instIteratorFor [Monad m] [Monad n] [Finite (ZipH α₁ m α₂ β₂) m] :
     IteratorFor (ZipH α₁ m α₂ β₂) m n :=
   .defaultImplementation
 

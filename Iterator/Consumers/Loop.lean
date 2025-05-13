@@ -1,50 +1,56 @@
 import Iterator.Basic
 
 @[specialize]
-def IterM.DefaultConsumers.forIn {m : Type w → Type w'} {n : Type w → Type w''} [Monad n] [MonadLiftT m n]
+def IterM.DefaultConsumers.forIn {m : Type w → Type w'}
+    {n : Type w → Type w''} [Monad n] (lift : ∀ γ, m γ → n γ)
     {α : Type w} {β : Type v} {γ : Type w}
     [Iterator α m β] [Finite α m]
     (it : IterM (α := α) m β) (init : γ)
-    (f : (b : β) → (c : γ) → n (ForInStep γ)) : n γ := do
-  match (← it.stepH).inflate with
-  | .yield it' out _ =>
-    match ← f out init with
-    | .yield c => IterM.DefaultConsumers.forIn it' c f
-    | .done c => return c
-  | .skip it' _ => IterM.DefaultConsumers.forIn it' init f
-  | .done _ => return init
+    (f : (b : β) → (c : γ) → n (ForInStep γ)) : n γ :=
+  letI : MonadLift m n := ⟨fun {γ} => lift γ⟩
+  do
+    match (← it.stepH).inflate with
+    | .yield it' out _ =>
+      match ← f out init with
+      | .yield c => IterM.DefaultConsumers.forIn lift it' c f
+      | .done c => return c
+    | .skip it' _ => IterM.DefaultConsumers.forIn lift it' init f
+    | .done _ => return init
 termination_by it.finitelyManySteps
 
-class IteratorFor (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] (n : Type w → Type w'') where
-  forIn : ∀ {γ : Type w}, IterM (α := α) m β → γ →
-      ((b : β) → (c : γ) → n (ForInStep γ)) →
-      n γ
+class IteratorFor (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β]
+    (n : Type w → Type w'') where
+  forIn : ∀ (_lift : (γ : Type w) → m γ → n γ) {γ : Type w},
+      IterM (α := α) m β → γ →
+      ((b : β) → (c : γ) → n (ForInStep γ)) → n γ
 
 class LawfulIteratorFor (α : Type w) (m : Type w → Type w') (n : Type w → Type w'')
-    [Monad n] [Iterator α m β] [Finite α m] [IteratorFor α m n] [MonadLiftT m n] where
-  lawful : ∀ γ, IteratorFor.forIn (α := α) (m := m) (n := n) (γ := γ) =
-    IterM.DefaultConsumers.forIn (α := α) (m := m) (n := n) (γ := γ)
+    [Monad n] [Iterator α m β] [Finite α m] [IteratorFor α m n] where
+  lawful : ∀ lift γ, IteratorFor.forIn lift (α := α) (m := m) (γ := γ) =
+    IterM.DefaultConsumers.forIn (α := α) (m := m) (n := n) (lift := lift) (γ := γ)
 
 def IteratorFor.defaultImplementation {α : Type w} {m : Type w → Type w'} {n : Type w → Type w'}
-    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
+    [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
     IteratorFor α m n where
-  forIn := IterM.DefaultConsumers.forIn
+  forIn lift := IterM.DefaultConsumers.forIn lift
 
 instance (α : Type w) (m : Type w → Type w') (n : Type w → Type w')
-    [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
-    haveI : IteratorFor α m n := .defaultImplementation
+    [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
+    letI : IteratorFor α m n := .defaultImplementation
     LawfulIteratorFor α m n :=
   letI : IteratorFor α m n := .defaultImplementation
-  ⟨fun _ => rfl⟩
+  ⟨fun _ _ => rfl⟩
 
 instance {m : Type w → Type w'} {n : Type w → Type w''}
-    {α : Type w} {β : Type v} [Iterator α m β] [IteratorFor α m n] :
+    {α : Type w} {β : Type v} [Iterator α m β] [IteratorFor α m n]
+    [MonadLiftT m n] :
     ForIn n (IterM (α := α) m β) β where
-  forIn := IteratorFor.forIn
+  forIn := IteratorFor.forIn (fun _ => MonadLiftT.monadLift)
 
 @[specialize]
 def IterM.foldM {m : Type w → Type w'} {n : Type w → Type w'} [Monad n]
     {α : Type w} {β : Type v} {γ : Type w} [Iterator α m β] [IteratorFor α m n]
+    [MonadLiftT m n]
     (f : γ → β → n γ) (init : γ) (it : IterM (α := α) m β) : n γ :=
   ForIn.forIn it init (fun x acc => ForInStep.yield <$> f acc x)
 

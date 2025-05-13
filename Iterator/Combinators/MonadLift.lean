@@ -52,7 +52,7 @@ instance {_ : Iterator α m β} [Finite α m] {_ : MonadLiftT m n} : FinitenessR
     case done h =>
       cases h
 
-instance MonadLiftIterator.instIteratorFor [Monad n] [Monad n'] [MonadLiftT n n']
+instance MonadLiftIterator.instIteratorFor [Monad n] [Monad n']
     [Iterator α m β] [Finite α m] {_ : MonadLiftT m n} :
     IteratorFor (MonadLiftIterator α m n) n n' :=
   .defaultImplementation

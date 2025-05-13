@@ -8,3 +8,13 @@ import Iterator.Pure.Basic
 def Iter.filterMap {α : Type w} {β : Type v} [Iterator α Id β]
     (f : β → Option γ) (it : Iter (α := α) β) :=
   ((it.toIterM.filterMap f).toPureIter : Iter γ)
+
+@[always_inline, inline]
+def Iter.filter {α : Type w} {β : Type v} [Iterator α Id β]
+    (f : β → Bool) (it : Iter (α := α) β) :=
+  ((it.toIterM.filter f).toPureIter : Iter β)
+
+@[always_inline, inline]
+def Iter.map {α : Type w} {β : Type v} [Iterator α Id β]
+    (f : β → γ) (it : Iter (α := α) β) :=
+  ((it.toIterM.map f).toPureIter : Iter γ)

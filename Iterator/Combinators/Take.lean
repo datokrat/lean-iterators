@@ -168,7 +168,7 @@ instance Take.instFinitenessRelation [Monad m] [Iterator α m β] [Productive α
 instance Take.instIteratorToArray [Monad m] [Iterator α m β] [Productive α m] : IteratorToArray (Take α m β) m :=
   .defaultImplementation
 
-instance Take.instIteratorFor [Monad m] [Monad n] [MonadLiftT m n] [Iterator α m β] [Finite α m] :
+instance Take.instIteratorFor [Monad m] [Monad n] [Iterator α m β] [Finite α m] :
     IteratorFor (Take α m β) m n :=
   .defaultImplementation
   -- TODO: use [IteratorFor α m n]
