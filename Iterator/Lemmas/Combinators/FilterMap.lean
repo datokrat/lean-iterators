@@ -43,7 +43,7 @@ theorem Iter.step_filterMap {α β γ} [Iterator α Id β] {it : Iter (α := α)
         | some out' => .yield (it'.filterMap f) out' (.yieldSome (out := out) h h')
       | .skip it' h => .skip (it'.filterMap f) (.skip h)
       | .done h => .done (.done h) := by
-  simp only [filterMap_eq, step, toIterM_toPureIter, Id.run, IterM.filterMapH_stepH, Id.pure_eq,
+  simp only [filterMap_eq, step, toIterM_toPureIter, Id.run, IterM.stepH_filterMapH, Id.pure_eq,
     Id.bind_eq]
   generalize it.toIterM.stepH.inflate = step
   obtain ⟨step, h⟩ := step
