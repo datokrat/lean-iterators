@@ -5,3 +5,4 @@ import Iterator.Pure
 import Iterator.Producers
 import Iterator.Combinators
 import Iterator.Consumers
+import Iterator.Lemmas

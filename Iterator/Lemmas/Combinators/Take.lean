@@ -22,14 +22,14 @@ theorem Iter.step_take {α β} [Iterator α Id β] {n : Nat}
         | .yield it' out h => .yield (it'.take k) out (.yield h rfl)
         | .skip it' h => .skip (it'.take (k + 1)) (.skip h rfl)
         | .done h => .done (.done h)) := by
-  simp only [Iter.step, Iter.step, Iter.take_eq, IterM.stepH_take, toIterM_toPureIter]
+  simp only [Iter.step, Iter.step, Iter.take_eq, IterM.step_take, toIterM_toPureIter]
   cases n
   case zero =>
     simp [Id.run, PlausibleIterStep.map, PlausibleIterStep.done]
   case succ k =>
     simp only [Id.pure_eq, Id.bind_eq, Id.run, take_eq]
     dsimp only [toIterM_toPureIter]
-    generalize it.toIterM.stepH.inflate = step
+    generalize it.toIterM.step = step
     obtain ⟨step, h⟩ := step
     cases step <;>
       simp [PlausibleIterStep.map, PlausibleIterStep.yield, PlausibleIterStep.skip,

@@ -10,35 +10,35 @@ import Iterator.Consumers.Monadic.Partial
 section ToArray
 
 @[always_inline, inline]
-def IterM.DefaultConsumers.toArrayMapped {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type v}
+def IterM.DefaultConsumers.toArrayMapped {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
     [Iterator α m β] [Finite α m] {γ : Type w} (f : β → m γ) (it : IterM (α := α) m β) : m (Array γ) :=
   go it #[]
 where
   @[specialize]
   go [Monad m] [Finite α m] (it : IterM (α := α) m β) a := do
-    match (← it.stepH).inflate with
+    match ← it.step with
     | .yield it' b _ => go it' (a.push (← f b))
     | .skip it' _ => go it' a
     | .done _ => return a
   termination_by it.finitelyManySteps
 
 @[always_inline, inline]
-partial def IterM.DefaultConsumers.toArrayMappedPartial {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type v}
+partial def IterM.DefaultConsumers.toArrayMappedPartial {α : Type w} {m : Type w → Type w'} [Monad m] {β : Type w}
     [Iterator α m β] {γ : Type w} (f : β → m γ) (it : IterM (α := α) m β) : m (Array γ) :=
   go it #[]
 where
   @[specialize]
   go [Monad m] (it : IterM (α := α) m β) a := do
-    match (← it.stepH).inflate with
+    match ← it.step with
     | .yield it' b _ => go it' (a.push (← f b))
     | .skip it' _ => go it' a
     | .done _ => return a
 
-class IteratorToArray (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] where
+class IteratorToArray (α : Type w) (m : Type w → Type w') {β : Type w} [Iterator α m β] where
   toArrayMapped : ∀ {γ : Type w}, (β → m γ) → IterM (α := α) m β → m (Array γ)
 
 class IteratorToArrayPartial
-  (α : Type w) (m : Type w → Type w') {β : Type v} [Iterator α m β] where
+  (α : Type w) (m : Type w → Type w') {β : Type w} [Iterator α m β] where
     toArrayMappedPartial : ∀ {γ : Type w}, (β → m γ) → IterM (α := α) m β → m (Array γ)
 
 class LawfulIteratorToArray (α : Type w) (m : Type w → Type w') [Monad m] [Iterator α m β] [IteratorToArray α m] where

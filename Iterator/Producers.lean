@@ -14,7 +14,7 @@ section ListIterator
 
 variable {α : Type w} {m : Type w → Type w'}
 
-structure ListIterator (α : Type u) where
+structure ListIterator (α : Type w) where
   list : List α
 
 /--
@@ -36,10 +36,9 @@ instance {α : Type w} [Pure m] : Iterator (ListIterator α) m α where
     | .yield it' out => it.inner.list = out :: it'.inner.list
     | .skip _ => False
     | .done => it.inner.list = []
-  step_small := inferInstance
   step it := pure (match it with
-        | ⟨⟨[]⟩⟩ => .deflate ⟨.done, rfl⟩
-        | ⟨⟨x :: xs⟩⟩ => .deflate ⟨.yield (toIter ⟨xs⟩ m α) x, rfl⟩)
+        | ⟨⟨[]⟩⟩ => ⟨.done, rfl⟩
+        | ⟨⟨x :: xs⟩⟩ => ⟨.yield (toIter ⟨xs⟩ m α) x, rfl⟩)
 
 instance [Pure m] : FinitenessRelation (ListIterator α) m where
   rel := InvImage WellFoundedRelation.rel (ListIterator.list ∘ IterM.inner)
@@ -77,8 +76,7 @@ instance [Pure m] : Iterator (UnfoldIterator α f) m α where
     | .yield it' out => out = it.inner.next ∧ it' = toIter ⟨f it.inner.next⟩ m α
     | .skip _ => False
     | .done => False
-  step_small := inferInstance
-  step it := pure <| .deflate <| .yield (toIter ⟨f it.inner.next⟩ m α) it.inner.next (by simp)
+  step it := pure <| .yield (toIter ⟨f it.inner.next⟩ m α) it.inner.next (by simp)
 
 /--
 Creates an infinite, productive iterator. First it yields `init`.

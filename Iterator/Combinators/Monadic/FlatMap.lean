@@ -24,7 +24,7 @@ Several variants of `flatMap` are provided:
 
 -- universe u' v u
 
--- variable {α : Type u} {β : Type v}
+-- variable {α : Type u} {β : Type w}
 --   {m : Type (max u v) → Type (max u v)}
 --   {n : Type (max u v u') → Type (max u v u')}
 --   {f : ∀ ⦃δ δ'⦄, (δ → δ') → m δ → n δ'}
@@ -68,8 +68,8 @@ section FlatMap
 
 section FlatMapDef
 
-variable {α : Type w} {β : Type v} {α₂ : Type w}
-  {γ : Type x} {m : Type w → Type w'} [Iterator α m β]
+variable {α : Type w} {β : Type w} {α₂ : Type w}
+  {γ : Type w} {m : Type w → Type w'} [Iterator α m β]
   {f : (it : IterM (α := α) m β) → (out : β) → it.plausible_output out → IterM (α := α₂) m γ}
 
 @[ext]
@@ -118,14 +118,14 @@ _TODO_: Improve this so that the cost is only incurred with each output of `it`.
 least work for internal iterator types that contain a computationally cheap empty iterator.
 -/
 @[always_inline, inline]
-def IterM.flatMap {α : Type w} {β : Type v} {α₂ : Type w}
-    {γ : Type x} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
+def IterM.flatMap {α : Type w} {β : Type w} {α₂ : Type w}
+    {γ : Type w} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
     (f : β → IterM (α := α₂) m γ) (it : IterM (α := α) m β) :=
   (toIter (⟨it, none⟩ : FlatMap α (fun _ out _ => f out)) m γ : IterM m γ)
 
 @[always_inline, inline]
-def IterM.flatMapAfter {α : Type w} {β : Type v} {α₂ : Type w}
-    {γ : Type x} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
+def IterM.flatMapAfter {α : Type w} {β : Type w} {α₂ : Type w}
+    {γ : Type w} {m : Type w → Type w'} [Monad m] [Iterator α m β] [Iterator α₂ m γ]
     (f : β → IterM (α := α₂) m γ) (it₁ : IterM (α := α) m β) (it₂ : Option (IterM (α := α₂) m γ)) :=
   (toIter (⟨it₁, it₂⟩ : FlatMap α (fun _ out _ => f out)) m γ : IterM m γ)
 /-
@@ -165,99 +165,33 @@ inductive FlatMap.PlausibleStep [Iterator α₂ m γ] :
       it₂.plausible_step .done →
       PlausibleStep (toIter ⟨it₁, some it₂⟩ m γ) (.skip (toIter ⟨it₁, none⟩ m γ))
 
-def FlatMap.step [Monad m] [Iterator α₂ m γ] (it : IterM (α := FlatMap α f) m γ) :
-    HetT m (IterStep (α := IterM (α := FlatMap α f) m γ) γ) :=
-  match it with
-  | ⟨it₁, none⟩ => it₁.stepHet.pbindH fun
-      | ⟨.yield it₁' b, h⟩ => pure <| .skip ⟨it₁', some (f it₁ b ⟨_, h⟩)⟩
-      | ⟨.skip it₁', _⟩ => pure <| .skip ⟨it₁', none⟩
-      | ⟨.done, _⟩ => pure <| .done
-  | ⟨it₁, some it₂⟩ => it₂.stepHet.bindH fun
-      | .yield it₂' out => pure <| .yield ⟨it₁, some it₂'⟩ out
-      | .skip it₂' => pure <| .skip ⟨it₁, some it₂'⟩
-      | .done => pure <| .skip ⟨it₁, none⟩
-
-theorem FlatMap.PlausibleStep.char [Monad m] [Iterator α₂ m γ] {it : IterM (α := FlatMap α f) m γ} :
-    FlatMap.PlausibleStep it = (FlatMap.step it).property := by
-  ext step
-  simp only [FlatMap.step, HetT.bindH, HetT.pbindH]
-  constructor
-  · intro h
-    cases h
-    case outerYield it₁ it₁' b h =>
-      simp only [toIter, Subtype.exists]
-      exact ⟨.yield it₁' b, h, rfl⟩
-    case outerSkip it₁ it₁' h =>
-      simp only [toIter, Subtype.exists]
-      exact ⟨.skip it₁', h, rfl⟩
-    case outerDone h =>
-      simp only [toIter, Subtype.exists]
-      exact ⟨.done, h, rfl⟩
-    case innerYield it₂ it₂' out h =>
-      exact ⟨.yield it₂' out, h, rfl⟩
-    case innerSkip it₂ it₂' h =>
-      exact ⟨.skip it₂', h, rfl⟩
-    case innerDone h =>
-      exact ⟨.done, h, rfl⟩
-  · match it with
-    | ⟨it₁, none⟩ =>
-      rintro ⟨⟨step, hp⟩, h⟩
-      cases step
-      case yield =>
-        cases h
-        exact .outerYield hp
-      case skip =>
-        cases h
-        exact .outerSkip hp
-      case done =>
-        cases h
-        exact .outerDone hp
-    | ⟨it₁, some it₂⟩ =>
-      rintro ⟨step, hp, h⟩
-      cases step
-      case yield =>
-        cases h
-        exact .innerYield hp
-      case skip =>
-        cases h
-        exact .innerSkip hp
-      case done =>
-        cases h
-        exact .innerDone hp
-
-instance [Monad m] [Iterator α₂ m γ] {it : IterM (α := FlatMap α f) m γ} :
-    Small.{w} (Subtype <| FlatMap.PlausibleStep it) := by
-  rw [FlatMap.PlausibleStep.char]
-  exact (FlatMap.step it).small
-
 instance FlatMap.instIterator [Monad m] [Iterator α₂ m γ] : Iterator (FlatMap α f) m γ where
   plausible_step := PlausibleStep
-  step_small := inferInstance
   step it :=
     match it with
     | ⟨it₁, none⟩ => do
-      match (← it₁.stepH).inflate with
+      match ← it₁.step with
       | .yield it₁' b h =>
-          pure <| .deflate <| .skip ⟨it₁', some (f it₁ b ⟨_, h⟩)⟩ (.outerYield h)
+          pure <| .skip ⟨it₁', some (f it₁ b ⟨_, h⟩)⟩ (.outerYield h)
       | .skip it₁' h =>
-          pure <| .deflate <| .skip ⟨it₁', none⟩ (.outerSkip h)
+          pure <| .skip ⟨it₁', none⟩ (.outerSkip h)
       | .done h =>
-          pure <| .deflate <| .done (.outerDone h)
+          pure <| .done (.outerDone h)
     | ⟨it₁, some it₂⟩ => do
-      match (← it₂.stepH).inflate with
+      match ← it₂.step with
       | .yield it₂' c h =>
-          pure <| .deflate <| .yield ⟨it₁, some it₂'⟩ c (.innerYield h)
+          pure <| .yield ⟨it₁, some it₂'⟩ c (.innerYield h)
       | .skip it₂' h =>
-          pure <| .deflate <| .skip ⟨it₁, some it₂'⟩ (.innerSkip h)
+          pure <| .skip ⟨it₁, some it₂'⟩ (.innerSkip h)
       | .done h =>
-          pure <| .deflate <| .skip ⟨it₁, none⟩ (.innerDone h)
+          pure <| .skip ⟨it₁, none⟩ (.innerDone h)
 
 end FlatMapDef
 
 section Finite
 
-variable {α : Type w} {β : Type v} {α₂ : Type w}
-    {γ : Type x} {m : Type w → Type w'} [Iterator α m β]
+variable {α : Type w} {β : Type w} {α₂ : Type w}
+    {γ : Type w} {m : Type w → Type w'} [Iterator α m β]
     {f : (it : IterM (α := α) m β) → (out : β) → it.plausible_output out → IterM (α := α₂) m γ}
 
 variable (α m f) in
@@ -357,71 +291,31 @@ end Finite
 section Dependent
 
 variable {m : Type w → Type w'}
-  {β : Type v} {α : β → Type w} {γ : Type v'}
+  {β : Type w} {α : β → Type w} {γ : Type w}
 
-structure SigmaIterator {β : Type v} (α : β → Type w) (m : Type w → Type w') (γ : Type x) where
-  small : Small.{w} β := by infer_instance
-  b : USquash.{w} β
-  inner : IterM (α := α b.inflate) m γ
+structure SigmaIterator {β : Type w} (α : β → Type w) (m : Type w → Type w') (γ : Type w) where
+  b : β
+  inner : IterM (α := α b) m γ
 
 inductive SigmaIterator.PlausibleStep [∀ b, Iterator (α b) m γ]
     (it : IterM (α := SigmaIterator α m γ) m γ) : (step : IterStep (IterM (α := SigmaIterator α m γ) m γ) γ) → Prop where
-  | yield : ∀ {it' : IterM (α := α (it.inner.b.inflate (small := _))) m γ} {out : γ},
-      it.inner.inner.plausible_step (.yield it' out) → PlausibleStep it (.yield (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ) out)
-  | skip : ∀ {it' : IterM (α := α (it.inner.b.inflate (small := _))) m γ},
-      it.inner.inner.plausible_step (.skip it') → PlausibleStep it (.skip (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ))
+  | yield : ∀ {it' : IterM (α := α (it.inner.b)) m γ} {out : γ},
+      it.inner.inner.plausible_step (.yield it' out) → PlausibleStep it (.yield (toIter ⟨it.inner.b, it'⟩ m γ) out)
+  | skip : ∀ {it' : IterM (α := α (it.inner.b)) m γ},
+      it.inner.inner.plausible_step (.skip it') → PlausibleStep it (.skip (toIter ⟨it.inner.b, it'⟩ m γ))
   | done : it.inner.inner.plausible_step .done → PlausibleStep it .done
 
-def SigmaIterator.step [Monad m] [∀ b, Iterator (α b) m γ] (it : IterM (α := SigmaIterator α m γ) m γ) :
-    HetT m (IterStep (IterM (α := SigmaIterator α m γ) m γ) γ) :=
-  it.inner.inner.stepHet.bindH fun
-    | .yield it' out => pure <| .yield (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ) out
-    | .skip it' => pure <| .skip (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ)
-    | .done => pure <| .done
-
-theorem SigmaIterator.PlausibleStep.char [Monad m] [∀ b, Iterator (α b) m γ] (it : IterM (α := SigmaIterator α m γ) m γ) :
-    SigmaIterator.PlausibleStep it = (SigmaIterator.step it).property := by
-  ext step
-  simp only [SigmaIterator.step]
-  constructor
-  · intro h
-    cases h
-    case yield it' out h =>
-      exact ⟨.yield it' out, h, rfl⟩
-    case skip it' h =>
-      exact ⟨.skip it', h, rfl⟩
-    case done h =>
-      exact ⟨.done, h, rfl⟩
-  · rintro ⟨step, hp, h⟩
-    cases step
-    case yield =>
-      cases h
-      exact .yield hp
-    case skip =>
-      cases h
-      exact .skip hp
-    case done =>
-      cases h
-      exact .done hp
-
-instance [Monad m] [∀ b, Iterator (α b) m γ] {it : IterM (α := SigmaIterator α m γ) m γ} :
-    Small.{w} (Subtype <| SigmaIterator.PlausibleStep it) := by
-  rw [SigmaIterator.PlausibleStep.char]
-  exact (SigmaIterator.step it).small
-
-instance SigmaIterator.instIterator {β : Type v} {α : β → Type w} [Monad m] [∀ b, Iterator (α b) m γ] :
+instance SigmaIterator.instIterator {β : Type w} {α : β → Type w} [Monad m] [∀ b, Iterator (α b) m γ] :
     Iterator (SigmaIterator α m γ) m γ where
   plausible_step := PlausibleStep
-  step_small := inferInstance
   step it := do
-    haveI := it.inner.small
-    match (← it.inner.inner.stepH).inflate with
+    match ← it.inner.inner.step with
     | .yield it' out h =>
-      pure <| .deflate <| .yield (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ) out (.yield h)
+      pure <| .yield (toIter ⟨it.inner.b, it'⟩ m γ) out (.yield h)
     | .skip it' h =>
-      pure <| .deflate <| .skip (toIter ⟨it.inner.small, it.inner.b, it'⟩ m γ) (.skip h)
+      pure <| .skip (toIter ⟨it.inner.b, it'⟩ m γ) (.skip h)
     | .done h =>
-      pure <| .deflate <| .done (.done h)
+      pure <| .done (.done h)
 
 def SigmaIterator.rel [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
     IterM (α := SigmaIterator α m γ) m γ → IterM (α := SigmaIterator α m γ) m γ → Prop :=
@@ -429,9 +323,9 @@ def SigmaIterator.rel [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] :
     (PSigma.Lex emptyRelation
       (β := fun b : β => IterM (α := α b) m γ)
       (fun _ => InvImage IterM.TerminationMeasures.Finite.rel IterM.finitelyManySteps))
-    (fun it => ⟨it.inner.b.inflate (small := _), it.inner.inner⟩)
+    (fun it => ⟨it.inner.b, it.inner.inner⟩)
 
-instance SigmaIterator.finitenessRelation {β : Type v} {α : β → Type w}
+instance SigmaIterator.finitenessRelation {β : Type w} {α : β → Type w}
     [Monad m] [∀ b, Iterator (α b) m γ] [∀ b, Finite (α b) m] : FinitenessRelation (SigmaIterator α m γ) m where
   rel := SigmaIterator.rel
   wf := by
@@ -478,8 +372,8 @@ end Dependent
 section IterM
 
 @[always_inline, inline]
-def IterM.flatMapD {α : Type w} {β : Type v} {α₂ : β → Type w}
-    {γ : Type x} {m : Type w → Type w'}
+def IterM.flatMapD {α : Type w} {β : Type w} {α₂ : β → Type w}
+    {γ : Type w} {m : Type w → Type w'}
     [Monad m] [Iterator α m β] [(b : β) → Iterator (α₂ b) m γ]
     (f : (b : β) → IterM (α := α₂ b) m γ)
     (it : IterM (α := α) m β) :=
@@ -487,8 +381,8 @@ def IterM.flatMapD {α : Type w} {β : Type v} {α₂ : β → Type w}
     fun b => α₂ b.val
   letI α_sigma := SigmaIterator motive m γ
   letI g (it : IterM (α := α) m β) (out : β) (h : it.plausible_output out) : IterM (α := α_sigma) m γ :=
-    toIter (SigmaIterator.mk inferInstance (.deflate (Subtype.mk out (Exists.intro it h)) (small := _))
-      (f (USquash.deflate (Subtype.mk out (Exists.intro it h))).inflate.val)) m γ
+    toIter (SigmaIterator.mk (Subtype.mk out (Exists.intro it h))
+      (f (Subtype.mk out (Exists.intro it h)).val)) m γ
   (toIter (FlatMap.mk it none) m γ : IterM (α := FlatMap α g) m γ)
 
 end IterM

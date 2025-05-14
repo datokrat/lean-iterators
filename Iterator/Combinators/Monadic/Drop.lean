@@ -12,7 +12,7 @@ import Iterator.Consumers.Loop
 This file provides the iterator combinator `IterM.drop`.
 -/
 
-variable {α : Type w} {m : Type w → Type w'} {β : Type v}
+variable {α : Type w} {m : Type w → Type w'} {β : Type w}
 
 structure Drop (α : Type w) (m : Type w → Type w') (β : Type v) where
   remaining : Nat
@@ -57,60 +57,18 @@ inductive Drop.PlausibleStep [Iterator α m β] (it : IterM (α := Drop α m β)
   | yield : ∀ {it' out}, it.inner.inner.plausible_step (.yield it' out) →
       it.inner.remaining = 0 → PlausibleStep it (.yield (it'.drop 0) out)
 
-def Drop.step [Monad m] [Iterator α m β] (it : IterM (α := Drop α m β) m β) :
-    HetT m (IterStep (IterM (α := Drop α m β) m β) β) := do
-  match ← it.inner.inner.stepHet with
-  | .yield it' out =>
-    match it.inner.remaining with
-    | 0 => return .yield (it'.drop 0) out
-    | k + 1 => return .skip (it'.drop k)
-  | .skip it' => return .skip (it'.drop it.inner.remaining)
-  | .done => return .done
-
-theorem Drop.PlausibleStep.char [Monad m] [Iterator α m β] {it : IterM (α := Drop α m β) m β} :
-    Drop.PlausibleStep it = (Drop.step it).property := by
-  ext step
-  simp only [Drop.step, bind, HetT.bindH]
-  constructor
-  · intro h
-    cases h
-    all_goals
-      refine ⟨_, ‹_›, ?_⟩
-      simp_all [pure]
-  · rintro ⟨step, hp, h⟩
-    cases step
-    case yield =>
-      dsimp only at h
-      split at h
-      · cases h
-        exact .yield hp ‹_›
-      · cases h
-        exact .drop hp ‹_›
-    case skip =>
-      cases h
-      exact .skip hp
-    case done =>
-      cases h
-      exact .done hp
-
-instance [Monad m] [Iterator α m β] {it : IterM (α := Drop α m β) m β} :
-    Small.{w} (Subtype <| Drop.PlausibleStep it) := by
-  rw [Drop.PlausibleStep.char]
-  exact (Drop.step it).small
-
 instance Drop.instIterator [Monad m] [Iterator α m β] : Iterator (Drop α m β) m β where
   plausible_step := Drop.PlausibleStep
-  step_small := inferInstance
   step it := do
-    match (← it.inner.inner.stepH).inflate (small := _) with
+    match ← it.inner.inner.step with
     | .yield it' out h =>
       match h' : it.inner.remaining with
-      | 0 => pure <| .deflate <| .yield (it'.drop 0) out (.yield h h')
-      | k + 1 => pure <| .deflate <| .skip (it'.drop k) (.drop h h')
+      | 0 => pure <| .yield (it'.drop 0) out (.yield h h')
+      | k + 1 => pure <| .skip (it'.drop k) (.drop h h')
     | .skip it' h =>
-      pure <| .deflate <| .skip (it'.drop it.inner.remaining) (.skip h)
+      pure <| .skip (it'.drop it.inner.remaining) (.skip h)
     | .done h =>
-      pure <| .deflate <| .done (.done h)
+      pure <| .done (.done h)
 
 def Drop.rel (m : Type w → Type w') [Iterator α m β] [Finite α m] :
     IterM (α := Drop α m β) m β → IterM (α := Drop α m β) m β → Prop :=

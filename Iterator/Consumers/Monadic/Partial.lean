@@ -10,6 +10,6 @@ structure IterM.Partial {α : Type w} (m : Type w → Type w') (β : Type v) whe
   it : IterM (α := α) m β
 
 @[always_inline, inline]
-def IterM.allowNontermination {α : Type w} {m : Type w → Type w'} {β : Type v}
+def IterM.allowNontermination {α : Type w} {m : Type w → Type w'} {β : Type w}
     (it : IterM (α := α) m β) : IterM.Partial (α := α) m β :=
   ⟨it⟩

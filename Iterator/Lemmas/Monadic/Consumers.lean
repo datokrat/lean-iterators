@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul Reichert
 -/
 prelude
+import Init.Data.Array.Lemmas
 import Iterator.Consumers
 import Iterator.Lemmas.Monadic.Equivalence
 import Iterator.Producers
@@ -25,9 +26,8 @@ theorem IterM.DefaultConsumers.toArrayMapped.go.aux₁ [Monad m] [LawfulMonad m]
   induction it, bs using IterM.DefaultConsumers.toArrayMapped.go.induct
   next it bs ih₁ ih₂ =>
   rw [go, map_eq_pure_bind, go, bind_assoc]
-  refine congrArg (IterM.stepH it >>= ·) ?_
+  refine congrArg (IterM.step it >>= ·) ?_
   ext step
-  generalize step.inflate = step
   split
   · simp [ih₁ _ _ ‹_›]
   · simp [ih₂ _ ‹_›]
@@ -48,14 +48,13 @@ theorem IterM.DefaultConsumers.toArrayMapped.go.aux₂ [Monad m] [LawfulMonad m]
 theorem IterM.DefaultConsumers.toArrayMapped_of_stepH [Monad m] [LawfulMonad m]
     [Iterator α m β] [Finite α m] {it : IterM (α := α) m β} {f : β → m γ} :
     IterM.DefaultConsumers.toArrayMapped f it = (do
-      match (← it.stepH).inflate with
+      match ← it.step with
       | .yield it' out _ => return #[← f out] ++ (← IterM.DefaultConsumers.toArrayMapped f it')
       | .skip it' _ => IterM.DefaultConsumers.toArrayMapped f it'
       | .done _ => return #[]) := by
   rw [IterM.DefaultConsumers.toArrayMapped, IterM.DefaultConsumers.toArrayMapped.go]
   apply bind_congr
   intro step
-  generalize step.inflate = step
   split <;> simp [IterM.DefaultConsumers.toArrayMapped.go.aux₂]
 
 theorem IterM.DefaultConsumers.toArrayMapped_of_step [Monad m] [LawfulMonad m]
@@ -65,12 +64,7 @@ theorem IterM.DefaultConsumers.toArrayMapped_of_step [Monad m] [LawfulMonad m]
       | .yield it' out _ => return #[← f out] ++ (← IterM.DefaultConsumers.toArrayMapped f it')
       | .skip it' _ => IterM.DefaultConsumers.toArrayMapped f it'
       | .done _ => return #[]) := by
-  rw [IterM.DefaultConsumers.toArrayMapped_of_stepH, IterM.step, map_eq_pure_bind, bind_assoc]
-  apply bind_congr
-  intro step
-  generalize step.inflate = step
-  rw [pure_bind]
-  rfl
+  rw [IterM.DefaultConsumers.toArrayMapped_of_stepH, IterM.step]
 
 theorem IterM.toArray_of_step [Monad m] [LawfulMonad m]
     [Iterator α m β] [IteratorToArray α m] [LawfulIteratorToArray α m]
@@ -164,7 +158,7 @@ end Consumers
 section Congruence
 
 theorem IterM.Morphism.toArrayMapped_eq {α α' : Type w} {m : Type w → Type w'}
-    {β : Type v} {γ : Type w}
+    {β : Type w} {γ : Type w}
     [Monad m] [LawfulMonad m]
     [Iterator α m β] [Iterator α' m β] [IteratorToArray α m] [LawfulIteratorToArray α m]
     [IteratorToArray α' m] [LawfulIteratorToArray α' m]
@@ -178,7 +172,6 @@ theorem IterM.Morphism.toArrayMapped_eq {α α' : Type w} {m : Type w → Type w
   simp only [← φ.stepH_hom, map_eq_pure_bind, bind_assoc]
   apply bind_congr
   intro step
-  generalize step.inflate = step
   obtain ⟨step, _⟩ := step
   cases step <;> simp (discharger := assumption) [PlausibilityMorphism.mapStep, IterStep.map, ihs, ihy]
 

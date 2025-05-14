@@ -66,9 +66,9 @@ theorem Iter.toArray_of_step {α β} [Iterator α Id β] [IteratorToArray α Id]
       | .yield it' out _ => #[out] ++ it'.toArray
       | .skip it' _ => it'.toArray
       | .done _ => #[] := by
-  rw [Iter.toArray_eq_toArray_toIterM, Iter.step, IterM.toArray_of_step, IterM.step]
+  rw [Iter.toArray_eq_toArray_toIterM, Iter.step, IterM.toArray_of_step]
   simp only [Id.map_eq, Id.pure_eq, Id.bind_eq, Id.run]
-  generalize it.toIterM.stepH.inflate = step
+  generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   cases step <;>
     simp [PlausibleIterStep.map, PlausibleIterStep.yield, Iter.toArray_eq_toArray_toIterM]
@@ -87,10 +87,8 @@ theorem Iter.toListRev_of_step {α β} [Iterator α Id β] [Finite α Id] {it : 
       | .yield it' out _ => it'.toListRev ++ [out]
       | .skip it' _ => it'.toListRev
       | .done _ => [] := by
-  rw [Iter.toListRev_eq_toListRev_toIterM, IterM.toListRev_of_step, Iter.step, IterM.step]
+  rw [Iter.toListRev_eq_toListRev_toIterM, IterM.toListRev_of_step, Iter.step]
   simp only [Id.map_eq, Id.pure_eq, Id.bind_eq, Id.run]
-  generalize it.toIterM.stepH.inflate = step
+  generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   cases step <;> simp [PlausibleIterStep.map, PlausibleIterStep.yield]
-
--- TODO: congruence lemmas

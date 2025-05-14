@@ -13,7 +13,7 @@ import Iterator.HetT
 This file provides the iterator combinator `IterM.take`.
 -/
 
-variable {α : Type w} {m : Type w → Type w'} {β : Type v}
+variable {α : Type w} {m : Type w → Type w'} {β : Type w}
 
 structure Take (α : Type w) (m : Type w → Type w') (β : Type v) where
   remaining : Nat
@@ -48,7 +48,7 @@ This combinator incurs an additional O(1) cost with each output of `it`.
 def IterM.take (n : Nat) (it : IterM (α := α) m β) :=
   toIter (Take.mk n it) m β
 
-theorem IterM.take.surjective {α : Type w} {m : Type w → Type w'} {β : Type v}
+theorem IterM.take.surjective {α : Type w} {m : Type w → Type w'} {β : Type w}
     (it : IterM (α := Take α m β) m β) :
     ∃ (it₀ : IterM (α := α) m β) (k : Nat), it = it₀.take k := by
   refine ⟨it.inner.inner, it.inner.remaining, rfl⟩
@@ -63,67 +63,16 @@ inductive Take.PlausibleStep [Iterator α m β] (it : IterM (α := Take α m β)
   | depleted : it.inner.remaining = 0 →
       PlausibleStep it .done
 
-def Take.step [Monad m] [Iterator α m β] (it : IterM (α := Take α m β) m β) :
-    HetT m (IterStep (IterM (α := Take α m β) m β) β) :=
-  match it.inner.remaining with
-  | 0 => pure .done
-  | k + 1 => do
-    match (← it.inner.inner.stepHet) with
-    | .yield it' out => return .yield (it'.take k) out
-    | .skip it' => return .skip (it'.take (k + 1))
-    | .done => return .done
-
-theorem Take.PlausibleStep.char [Monad m] [Iterator α m β] {it : IterM (α := Take α m β) m β} :
-    Take.PlausibleStep it = (Take.step it).property := by
-  ext step
-  simp only [Take.step]
-  split
-  · simp only [pure]
-    constructor
-    · intro h
-      cases h <;> (try omega; done) <;> rfl
-    · rintro rfl
-      exact .depleted ‹_›
-  · simp [bind, HetT.bindH, IterM.stepHet]
-    constructor
-    · intro h
-      cases h
-      case yield =>
-        refine ⟨_, ‹_›, ?_⟩
-        simp_all [pure]
-      case skip =>
-        refine ⟨_, ‹_›, ?_⟩
-        simp_all [pure]
-      case done =>
-        refine ⟨_, ‹_›, ?_⟩
-        simp_all [pure]
-      case depleted =>
-        omega
-    · rintro ⟨step, hp, h⟩
-      cases step
-      · cases h
-        exact .yield hp ‹_›
-      · cases h
-        exact .skip hp ‹_›
-      · cases h
-        exact .done hp
-
-instance [Iterator α m β] [Monad m] {it : IterM (α := Take α m β) m β} :
-    Small.{w} (Subtype <| Take.PlausibleStep it) := by
-  rw [Take.PlausibleStep.char]
-  exact (Take.step it).small
-
 instance Take.instIterator [Monad m] [Iterator α m β] : Iterator (Take α m β) m β where
   plausible_step := Take.PlausibleStep
-  step_small := inferInstance
   step it :=
     match h : it.inner.remaining with
-    | 0 => pure <| .deflate <| .done (.depleted h)
+    | 0 => pure <| .done (.depleted h)
     | k + 1 => do
-      match (← it.inner.inner.stepH).inflate (small := _) with
-      | .yield it' out h' => pure <| .deflate <| .yield (it'.take k) out (.yield h' h)
-      | .skip it' h' => pure <| .deflate <| .skip (it'.take (k + 1)) (.skip h' h)
-      | .done h' => pure <| .deflate <| .done (.done h')
+      match ← it.inner.inner.step with
+      | .yield it' out h' => pure <| .yield (it'.take k) out (.yield h' h)
+      | .skip it' h' => pure <| .skip (it'.take (k + 1)) (.skip h' h)
+      | .done h' => pure <| .done (.done h')
 
 def Take.rel (m : Type w → Type w') [Monad m] [Iterator α m β] [Productive α m] :
     IterM (α := Take α m β) m β → IterM (α := Take α m β) m β → Prop :=

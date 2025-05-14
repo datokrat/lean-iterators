@@ -10,12 +10,12 @@ import Iterator.Combinators.FilterMap
 
 theorem Iter.filterMap_eq {α β γ} [Iterator α Id β] {it : Iter (α := α) β}
     {f : β → Option γ} :
-    it.filterMap f = (it.toIterM.filterMapH f).toPureIter :=
+    it.filterMap f = (it.toIterM.filterMap f).toPureIter :=
   rfl
 
 theorem Iter.map_eq {α β γ} [Iterator α Id β] {it : Iter (α := α) β}
     {f : β → γ} :
-    it.map f = (it.toIterM.mapH f).toPureIter :=
+    it.map f = (it.toIterM.map f).toPureIter :=
   rfl
 
 theorem Iter.filter_eq {α β} [Iterator α Id β] {it : Iter (α := α) β}
@@ -43,9 +43,9 @@ theorem Iter.step_filterMap {α β γ} [Iterator α Id β] {it : Iter (α := α)
         | some out' => .yield (it'.filterMap f) out' (.yieldSome (out := out) h h')
       | .skip it' h => .skip (it'.filterMap f) (.skip h)
       | .done h => .done (.done h) := by
-  simp only [filterMap_eq, step, toIterM_toPureIter, Id.run, IterM.stepH_filterMapH, Id.pure_eq,
+  simp only [filterMap_eq, step, toIterM_toPureIter, Id.run, IterM.step_filterMap, Id.pure_eq,
     Id.bind_eq]
-  generalize it.toIterM.stepH.inflate = step
+  generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   apply Subtype.ext
   match step with
@@ -54,7 +54,7 @@ theorem Iter.step_filterMap {α β γ} [Iterator α Id β] {it : Iter (α := α)
       PlausibleIterStep.yield, PlausibleIterStep.skip]
     split <;> split
     all_goals
-      simp only [USquash.inflate_deflate, IterStep.map_yield, id_eq, reduceCtorEq]
+      simp only [IterStep.map_yield, id_eq, reduceCtorEq]
       simp_all
   | .skip it' =>
     simp [PlausibleIterStep.map, IterStep.map_yield, id_eq, toIterM_toPureIter,
@@ -71,8 +71,8 @@ def Iter.step_map {α β γ} [Iterator α Id β] {it : Iter (α := α) β}
         .skip (it'.map f) (.skip h)
       | .done h =>
         .done (.done h) := by
-  simp only [map_eq, step, toIterM_toPureIter, Id.run, IterM.stepH_mapH, Id.pure_eq, Id.bind_eq]
-  generalize it.toIterM.stepH.inflate = step
+  simp only [map_eq, step, toIterM_toPureIter, Id.run, IterM.step_map, Id.pure_eq, Id.bind_eq]
+  generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   cases step
   · simp [PlausibleIterStep.map, PlausibleIterStep.yield]
@@ -91,8 +91,8 @@ def Iter.step_filter {α β} [Iterator α Id β] {it : Iter (α := α) β}
         .skip (it'.filter f) (.skip h)
       | .done h =>
         .done (.done h) := by
-  simp only [filter_eq, step, toIterM_toPureIter, Id.run, IterM.stepH_filter, Id.pure_eq, Id.bind_eq]
-  generalize it.toIterM.stepH.inflate = step
+  simp only [filter_eq, step, toIterM_toPureIter, Id.run, IterM.step_filter, Id.pure_eq, Id.bind_eq]
+  generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   cases step
   · simp only [PlausibleIterStep.map, IterStep.map_yield, id_eq, toIterM_toPureIter]
@@ -103,12 +103,12 @@ def Iter.step_filter {α β} [Iterator α Id β] {it : Iter (α := α) β}
 theorem Iter.toList_filterMap {α β γ} [Iterator α Id β] [IteratorToArray α Id] [LawfulIteratorToArray α Id]
     {f : β → Option γ} {it : Iter (α := α) β} :
     (it.filterMap f).toList = it.toList.filterMap f := by
-  simp [filterMap_eq, toList_eq_toList_toIterM, IterM.toList_filterMapH]
+  simp [filterMap_eq, toList_eq_toList_toIterM, IterM.toList_filterMap]
 
 theorem Iter.toList_map {α β γ} [Iterator α Id β] [IteratorToArray α Id] [LawfulIteratorToArray α Id]
     {f : β → γ} {it : Iter (α := α) β} :
     (it.map f).toList = it.toList.map f := by
-  simp [map_eq, IterM.toList_mapH, Iter.toList_eq_toList_toIterM]
+  simp [map_eq, IterM.toList_map, Iter.toList_eq_toList_toIterM]
 
 theorem Iter.toList_filter {α β} [Iterator α Id β] [IteratorToArray α Id] [LawfulIteratorToArray α Id]
     {f : β → Bool} {it : Iter (α := α) β} :

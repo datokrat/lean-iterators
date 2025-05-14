@@ -10,6 +10,6 @@ structure Iter.Partial {α : Type w} (β : Type v) where
   it : Iter (α := α) β
 
 @[always_inline, inline]
-def Iter.allowNontermination {α : Type w} {β : Type v}
+def Iter.allowNontermination {α : Type w} {β : Type w}
     (it : Iter (α := α) β) : Iter.Partial (α := α) β :=
   ⟨it⟩
