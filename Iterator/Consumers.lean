@@ -5,6 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Consumers.Monadic
+import Iterator.Consumers.Access
 import Iterator.Consumers.Collect
 import Iterator.Consumers.Loop
 import Iterator.Consumers.Partial

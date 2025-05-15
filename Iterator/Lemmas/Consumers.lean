@@ -92,3 +92,25 @@ theorem Iter.toListRev_of_step {α β} [Iterator α Id β] [Finite α Id] {it : 
   generalize it.toIterM.step = step
   obtain ⟨step, h⟩ := step
   cases step <;> simp [PlausibleIterStep.map, PlausibleIterStep.yield]
+
+theorem Iter.getElem?_toList_eq_getAtIdx? {α β}
+    [Iterator α Id β] [Finite α Id] [IteratorToArray α Id] [LawfulIteratorToArray α Id]
+    {it : Iter (α := α) β} {k : Nat} :
+    it.toList[k]? = it.getAtIdx? k := by
+  revert k
+  induction it using Iter.induct with | step it ihy ihs =>
+  intro k
+  rw [toList_of_step, getAtIdx?]
+  obtain ⟨step, h⟩ := it.step
+  cases step
+  · cases k <;> simp [ihy h]
+  · simp [ihs h]
+  · simp
+
+theorem Iter.toList_eq_of_getAtIdx?_eq {α₁ α₂ β}
+    [Iterator α₁ Id β] [Finite α₁ Id] [IteratorToArray α₁ Id] [LawfulIteratorToArray α₁ Id]
+    [Iterator α₂ Id β] [Finite α₂ Id] [IteratorToArray α₂ Id] [LawfulIteratorToArray α₂ Id]
+    {it₁ : Iter (α := α₁) β} {it₂ : Iter (α := α₂) β}
+    (h : ∀ k, it₁.getAtIdx? k = it₂.getAtIdx? k) :
+    it₁.toList = it₂.toList := by
+  ext; simp [getElem?_toList_eq_getAtIdx?, h]

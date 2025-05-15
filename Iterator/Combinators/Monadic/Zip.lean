@@ -59,7 +59,7 @@ instance Zip.instIterator [Monad m] :
           pure <| .done (.doneRight hm hp)
 
 @[inline]
-def IterM.zip [Monad m]
+def IterM.zip
     (left : IterM (α := α₁) m β₁) (right : IterM (α := α₂) m β₂) :
     IterM (α := Zip α₁ m α₂ β₂) m (β₁ × β₂) :=
   toIter ⟨left, none, right⟩ m _

@@ -13,7 +13,11 @@ def IterM.Intermediate.zip {α₁ α₂ m β₁ β₂} [Iterator α₁ m β₁]
         ∃ it : IterM (α := α₁) m β₁, it.plausible_output out }))
     (it₂ : IterM (α := α₂) m β₂) :
     IterM (α := Zip α₁ m α₂ β₂) m (β₁ × β₂) :=
-  ⟨it₁, memo, it₂⟩
+  ⟨⟨it₁, memo, it₂⟩⟩
+
+theorem IterM.zip_eq_intermediateZip {α₁ α₂ m β₁ β₂} [Iterator α₁ m β₁]
+    (it₁ : IterM (α := α₁) m β₁) (it₂ : IterM (α := α₂) m β₂) :
+    it₁.zip it₂ = Intermediate.zip it₁ none it₂ := rfl
 
 theorem IterM.step_intermediateZip {α₁ α₂ m β₁ β₂} [Monad m]
     [Iterator α₁ m β₁] [Iterator α₂ m β₂]

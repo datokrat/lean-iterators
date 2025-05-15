@@ -5,6 +5,7 @@ Authors: Paul Reichert
 -/
 prelude
 import Iterator.Combinators.Take
+import Iterator.Consumers.Access
 import Iterator.Lemmas.Monadic.Take
 import Iterator.Lemmas.Consumers
 
@@ -52,3 +53,26 @@ theorem Iter.toList_take_of_finite {α β} [Iterator α Id β] {n : Nat}
     · simp [ihy h]
     · simp [ihs h]
     · simp
+
+theorem Iter.getAtIdx?_take {α β}
+    [Iterator α Id β] [Productive α Id] {k l : Nat}
+    {it : Iter (α := α) β} :
+    (it.take k).getAtIdx? l = if l < k then it.getAtIdx? l else none := by
+  revert k
+  fun_induction it.getAtIdx? l
+  case case1 it it' out h h' =>
+    intro k
+    simp [getAtIdx?.eq_def (it := it.take k), getAtIdx?.eq_def (it := it), step_take, h']
+    cases k <;> simp
+  case case2 it it' out h h' l ih =>
+    intro k
+    simp [getAtIdx?.eq_def (it := it.take k), getAtIdx?.eq_def (it := it), step_take, h']
+    cases k <;> cases l <;> simp [ih]
+  case case3 l it it' h h' ih =>
+    intro k
+    simp [getAtIdx?.eq_def (it := it.take k), getAtIdx?.eq_def (it := it), step_take, h']
+    cases k <;> cases l <;> simp [ih]
+  case case4 l it h h' =>
+    intro k
+    simp only [getAtIdx?.eq_def (it := it.take k), getAtIdx?.eq_def (it := it), step_take, h']
+    cases k <;> cases l <;> simp
