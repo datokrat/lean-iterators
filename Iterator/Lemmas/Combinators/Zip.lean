@@ -24,7 +24,15 @@ def Iter.Intermediate.zip {α₁ α₂ β₁ β₂} [Iterator α₁ Id β₁]
 
 def Iter.Intermediate.zip_inj {α₁ α₂ β₁ β₂} [Iterator α₁ Id β₁] :
     ∀ {it₁ it₁' : Iter (α := α₁) β₁} {memo memo'} {it₂ it₂' : Iter (α := α₂) β₂},
-      zip it₁ memo it₂ = zip it₁' memo' it₂' ↔ it₁ = it₁' ∧ memo = memo' ∧ it₂ = it₂' := sorry
+      zip it₁ memo it₂ = zip it₁' memo' it₂' ↔ it₁ = it₁' ∧ memo = memo' ∧ it₂ = it₂' := by
+  intro it₁ it₁' memo memo' it₂ it₂'
+  apply Iff.intro
+  · intro h
+    cases it₁; cases it₁'; cases it₂; cases it₂'
+    obtain _ | ⟨⟨_⟩⟩ := memo <;> obtain _ | ⟨⟨_⟩⟩ := memo' <;>
+      simp_all [toIterM, IterM.toPureIter, zip, IterM.Intermediate.zip, Option.map_eq_map]
+  · rintro ⟨rfl, rfl, rfl⟩
+    rfl
 
 def Iter.Intermediate.zip_surj {α₁ α₂ β₁ β₂} [Iterator α₁ Id β₁] :
     ∀ it : Iter (α := Zip α₁ Id α₂ β₂) (β₁ × β₂), ∃ it₁ memo it₂, it = Intermediate.zip it₁ memo it₂ := by
